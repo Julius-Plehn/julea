@@ -338,6 +338,7 @@ j_item_dedup_get (JCollection* collection, JItemDedup** item, gchar const* name,
 
 	g_free(value);
 */
+
 static
 void
 j_item_hash_ref_callback (gpointer value, guint32 len, gpointer data_)
@@ -367,7 +368,7 @@ j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
 
 	chunk_kv = j_kv_new("chunk_refs", (const gchar*)hash);
 	j_kv_get_callback(chunk_kv, j_item_hash_ref_callback, &refcount, sub_batch);
-	j_batch_execute(sub_batch);
+	g_assert(j_batch_execute(sub_batch));
 
 	refcount -= 1;
 
@@ -381,7 +382,7 @@ j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
         value = bson_destroy_with_steal(new_ref_bson, TRUE, &value_len);
 
 		j_kv_put(chunk_kv, value, value_len, bson_free, sub_batch);
-		j_batch_execute(sub_batch);
+		g_assert(j_batch_execute(sub_batch));
 	}
 	else
 	{
@@ -494,7 +495,7 @@ j_item_deserialize_hashes (JItemDedup* item, bson_t const* b)
 void
 j_item_refresh_hashes (JItemDedup* item, JSemantics* semantics)
 {
-	gchar* json;
+	//gchar* json;
 	JBatch* sub_batch = j_batch_new(semantics);
 	gpointer b;
     guint32 len;
@@ -512,8 +513,10 @@ j_item_refresh_hashes (JItemDedup* item, JSemantics* semantics)
 
     // apparently an empty bson has len == 5
     if (data->len > 5)
+    {
         j_item_deserialize_hashes(item, data);
-    
+    }
+
 	bson_free(b);
     bson_destroy(data);
 }
@@ -682,7 +685,7 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 		last_buf = g_slice_alloc0(remaining);
 	}
 
-	j_batch_execute(sub_batch);
+	g_assert(j_batch_execute(sub_batch));
 
  	hash_context = algo_array[hash_choice]->create_context();
 
@@ -718,7 +721,7 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 		chunk_kv = j_kv_new("chunk_refs", (const gchar*)hash);
 		j_kv_get_callback(chunk_kv, j_item_hash_ref_callback, &refcount, sub_batch);
-		j_batch_execute(sub_batch);
+		g_assert(j_batch_execute(sub_batch));
 
 
 		if (refcount == 0)
@@ -744,13 +747,13 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount+1);
-
+        
         gpointer value;
 	    guint32 value_len;
         value = bson_destroy_with_steal(new_ref_bson, TRUE, &value_len);
 
 		j_kv_put(chunk_kv, value, value_len, bson_free, sub_batch);
-		j_batch_execute(sub_batch);
+		g_assert(j_batch_execute(sub_batch));
 
 		if (chunk < old_chunks)
 		{
@@ -771,11 +774,13 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 	j_kv_delete(item->kv_h, sub_batch);
     serializes_bson = j_item_serialize_hashes(item);
 
+    {
     gpointer value;
 	guint32 value_len;
     value = bson_destroy_with_steal(serializes_bson, TRUE, &value_len);
 	j_kv_put(item->kv_h, value, value_len, bson_free, sub_batch);
-	j_batch_execute(sub_batch);
+	g_assert(j_batch_execute(sub_batch));
+    }
 }
 
 /**
