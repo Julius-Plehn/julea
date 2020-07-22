@@ -44,7 +44,7 @@ int sha256_update(void *ctx, const void *data, size_t length){
 }
 
 int sha256_finalize(void *ctx, gchar **hash){
-	gchar *checksum_string = g_checksum_get_string(ctx);
+	const gchar *checksum_string = g_checksum_get_string(ctx);
 	*hash = g_strdup(checksum_string);
 	return strlen(*hash);
 }

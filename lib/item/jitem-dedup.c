@@ -80,6 +80,8 @@ struct JItemDedup
 
 	JCredentials* credentials;
 
+    //JDistribution* distribution;
+
 	JKV* kv;
 	JKV* kv_h;
 	JObject* object;
@@ -144,13 +146,9 @@ struct JItemDedup
 JItemDedup*
 j_item_dedup_ref (JItemDedup* item)
 {
+    J_TRACE_FUNCTION(NULL);
 	g_return_val_if_fail(item != NULL, NULL);
-
-	j_trace_enter(G_STRFUNC, NULL);
-
 	g_atomic_int_inc(&(item->ref_count));
-
-	j_trace_leave(G_STRFUNC);
 
 	return item;
 }
@@ -169,9 +167,9 @@ j_item_dedup_ref (JItemDedup* item)
 void
 j_item_dedup_unref (JItemDedup* item)
 {
-	g_return_if_fail(item != NULL);
+	J_TRACE_FUNCTION(NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
+	g_return_if_fail(item != NULL);
 
 	if (g_atomic_int_dec_and_test(&(item->ref_count)))
 	{
@@ -180,10 +178,17 @@ j_item_dedup_unref (JItemDedup* item)
 			j_kv_unref(item->kv);
 		}
 
-		if (item->kv_h != NULL)
+        if (item->kv_h != NULL)
 		{
 			j_kv_unref(item->kv_h);
 		}
+
+        /*
+		if (item->object != NULL)
+		{
+			j_distributed_object_unref(item->object);
+		}
+        */
 
 		if (item->collection != NULL)
 		{
@@ -191,13 +196,12 @@ j_item_dedup_unref (JItemDedup* item)
 		}
 
 		j_credentials_unref(item->credentials);
+		//j_distribution_unref(item->distribution);
 
 		g_free(item->name);
 
 		g_slice_free(JItemDedup, item);
 	}
-
-	j_trace_leave(G_STRFUNC);
 }
 
 /**
@@ -215,10 +219,9 @@ j_item_dedup_unref (JItemDedup* item)
 gchar const*
 j_item_dedup_get_name (JItemDedup* item)
 {
-	g_return_val_if_fail(item != NULL, NULL);
+    J_TRACE_FUNCTION(NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
-	j_trace_leave(G_STRFUNC);
+	g_return_val_if_fail(item != NULL, NULL);
 
 	return item->name;
 }
@@ -252,32 +255,32 @@ j_item_dedup_create (JCollection* collection, gchar const* name, JDistribution* 
 
 	if ((item = j_item_dedup_new(collection, name, distribution)) == NULL)
 	{
-		goto end;
+		return NULL;
 	}
 
     tmp = j_item_dedup_serialize(item, j_batch_get_semantics(batch));
 	value = bson_destroy_with_steal(tmp, TRUE, &len);
 
-	j_distributed_object_create(item->object, batch);
+	//j_distributed_object_create(item->object, batch);
 	j_kv_put(item->kv, value, len, bson_free, batch);
-
-
-end:
-	j_trace_leave(G_STRFUNC);
-
-	return item;
+	
+    return item;
 }
 
 static
 void
-j_item_dedup_get_callback (bson_t const* value, gpointer data_)
+j_item_dedup_get_callback (gpointer value, guint32 len, gpointer data_)
 {
 	JItemGetData* data = data_;
+	bson_t tmp[1];
 
-	*(data->item) = j_item_dedup_new_from_bson(data->collection, value);
+	bson_init_static(tmp, value, len);
+	*(data->item) = j_item_dedup_new_from_bson(data->collection, tmp);
 
 	j_collection_unref(data->collection);
 	g_slice_free(JItemGetData, data);
+
+	g_free(value);
 }
 
 /**
@@ -296,6 +299,8 @@ j_item_dedup_get_callback (bson_t const* value, gpointer data_)
 void
 j_item_dedup_get (JCollection* collection, JItemDedup** item, gchar const* name, JBatch* batch)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	JItemGetData* data;
 	g_autoptr(JKV) kv = NULL;
 	g_autofree gchar* path = NULL;
@@ -304,7 +309,6 @@ j_item_dedup_get (JCollection* collection, JItemDedup** item, gchar const* name,
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(name != NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
 
 	data = g_slice_new(JItemGetData);
 	data->collection = j_collection_ref(collection);
@@ -313,13 +317,11 @@ j_item_dedup_get (JCollection* collection, JItemDedup** item, gchar const* name,
 	path = g_build_path("/", j_collection_get_name(collection), name, NULL);
 	kv = j_kv_new("items", path);
 	j_kv_get_callback(kv, j_item_dedup_get_callback, data, batch);
-
-	j_trace_leave(G_STRFUNC);
 }
 
 static
 void
-j_item_hash_ref_callback (bson_t const* value, gpointer data_)
+j_item_hash_ref_callback (gpointer value, guint32 len, gpointer data_)
 {
 	bson_iter_t iter;
 	guint32* refcount = data_;
@@ -350,7 +352,7 @@ j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
 	{
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount);
-		j_kv_put(chunk_kv, new_ref_bson, sub_batch);
+		j_kv_put(chunk_kv, new_ref_bson, new_ref_bson->len, bson_free, sub_batch);
 		j_batch_execute(sub_batch);
 	}
 	else
@@ -377,10 +379,10 @@ j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
 void
 j_item_dedup_delete (JItemDedup* item, JBatch* batch)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(batch != NULL);
-
-	j_trace_enter(G_STRFUNC, NULL);
 
 	j_item_refresh_hashes(item, j_batch_get_semantics(batch));
 
@@ -395,17 +397,17 @@ j_item_dedup_delete (JItemDedup* item, JBatch* batch)
 		g_free(hash);
 	}
 
-	j_trace_leave(G_STRFUNC);
 }
 
 bson_t*
 j_item_serialize_hashes (JItemDedup* item)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	bson_t* b;
 
 	g_return_val_if_fail(item != NULL, NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
 
 	b = bson_new();
 
@@ -421,21 +423,20 @@ j_item_serialize_hashes (JItemDedup* item)
 	//g_print("JSON read %s\n", json);
 	bson_free(json);
 
-	j_trace_leave(G_STRFUNC);
-
 	return b;
 }
 
 void
 j_item_deserialize_hashes (JItemDedup* item, bson_t const* b)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	bson_iter_t iter;
 
 	guint len = 0;
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(b != NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
 
 	bson_iter_init_find(&iter, b, "len");
 	if (BSON_ITER_HOLDS_INT64(&iter))
@@ -460,8 +461,6 @@ j_item_deserialize_hashes (JItemDedup* item, bson_t const* b)
 			g_print("hash #%d was not a string\n", i);
 		}
 	}
-
-	j_trace_leave(G_STRFUNC);
 }
 
 void
@@ -469,20 +468,26 @@ j_item_refresh_hashes (JItemDedup* item, JSemantics* semantics)
 {
 	gchar* json;
 	JBatch* sub_batch = j_batch_new(semantics);
-	bson_t* b = bson_new();
+	gpointer b;
+    guint32 len;
+    bson_t data[1];
 
-	j_kv_get(item->kv_h, b, sub_batch);
+	j_kv_get(item->kv_h, &b, &len, sub_batch);
 	j_batch_execute(sub_batch);
 
 	json = bson_as_canonical_extended_json(b, NULL);
-	//g_print("JSON refreshed %s\n", json);
+	g_print("JSON refreshed %s\n", json);
 	bson_free(json);
 
+	bson_init_static(data, b, len);
+
 	// apparently an empty bson has len == 5
-	if (b->len > 5)
-		j_item_deserialize_hashes(item, b);
+	if (data->len > 5)
+		j_item_deserialize_hashes(item, data);
 
 	bson_free(b);
+    bson_destroy(data);
+	g_free(b);
 }
 /**
  * Reads an item.
@@ -502,6 +507,8 @@ j_item_refresh_hashes (JItemDedup* item, JSemantics* semantics)
 void
 j_item_dedup_read (JItemDedup* item, gpointer data, guint64 length, guint64 offset, guint64* bytes_read, JBatch* batch)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	guint64 chunks, first_chunk, destination_relative;
 	JObject *chunk_obj;
 
@@ -509,7 +516,6 @@ j_item_dedup_read (JItemDedup* item, gpointer data, guint64 length, guint64 offs
 	g_return_if_fail(data != NULL);
 	g_return_if_fail(bytes_read != NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
 
 	first_chunk = offset / item->chunk_size;
 	//FIXME test all cases
@@ -548,8 +554,6 @@ j_item_dedup_read (JItemDedup* item, gpointer data, guint64 length, guint64 offs
 		j_object_read(chunk_obj, (gchar*)data + destination_relative, part, from, bytes_read, batch);
 		destination_relative += part;
 	}
-
-	j_trace_leave(G_STRFUNC);
 }
 
 /**
@@ -573,12 +577,15 @@ j_item_dedup_read (JItemDedup* item, gpointer data, guint64 length, guint64 offs
 void
 j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint64 offset, guint64* bytes_written, JBatch* batch)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	guint64 first_chunk, chunk_offset, chunks, old_chunks, hash_len, remaining, bytes_read;
 	GArray* hashes;
 	gpointer first_buf, last_buf; // was wohl der type von last_buf ist :thinking:
 	JObject *first_obj, *last_obj, *chunk_obj;
 	JKV *chunk_kv;
 	bson_t *new_ref_bson;
+    bson_t *serializes_bson;
 	JBatch* sub_batch;
 	void* hash_context;
 	int hash_choice;
@@ -586,8 +593,6 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(data != NULL);
 	g_return_if_fail(bytes_written != NULL);
-
-	j_trace_enter(G_STRFUNC, NULL);
 
 	hash_choice = J_HASH_SHA256;
 	// refresh chunks before write
@@ -710,7 +715,7 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount+1);
-		j_kv_put(chunk_kv, new_ref_bson, sub_batch);
+		j_kv_put(chunk_kv, new_ref_bson, new_ref_bson->len, bson_free, sub_batch);
 		j_batch_execute(sub_batch);
 
 		if (chunk < old_chunks)
@@ -730,10 +735,9 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 	algo_array[hash_choice]->destroy(hash_context);
 
 	j_kv_delete(item->kv_h, sub_batch);
-	j_kv_put(item->kv_h, j_item_serialize_hashes(item), sub_batch);
+    serializes_bson = j_item_serialize_hashes(item);
+	j_kv_put(item->kv_h, serializes_bson, serializes_bson->len, bson_free, sub_batch);
 	j_batch_execute(sub_batch);
-
-	j_trace_leave(G_STRFUNC);
 }
 
 /**
@@ -750,15 +754,13 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 void
 j_item_dedup_get_status (JItemDedup* item, JBatch* batch)
 {
-	g_return_if_fail(item != NULL);
+    J_TRACE_FUNCTION(NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
+	g_return_if_fail(item != NULL);
 
 	// TODO: find a meaningful way to do this for chunks
 	// j_object_status(item->object, &(item->status.modification_time), &(item->status.size), batch);
 	(void) batch;
-
-	j_trace_leave(G_STRFUNC);
 }
 
 /**
@@ -776,10 +778,8 @@ j_item_dedup_get_status (JItemDedup* item, JBatch* batch)
 guint64
 j_item_dedup_get_size (JItemDedup* item)
 {
+    J_TRACE_FUNCTION(NULL);
 	g_return_val_if_fail(item != NULL, 0);
-
-	j_trace_enter(G_STRFUNC, NULL);
-	j_trace_leave(G_STRFUNC);
 
 	return item->status.size;
 }
@@ -799,10 +799,9 @@ j_item_dedup_get_size (JItemDedup* item)
 gint64
 j_item_dedup_get_modification_time (JItemDedup* item)
 {
-	g_return_val_if_fail(item != NULL, 0);
+    J_TRACE_FUNCTION(NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
-	j_trace_leave(G_STRFUNC);
+	g_return_val_if_fail(item != NULL, 0);
 
 	return item->status.modification_time;
 }
@@ -829,10 +828,9 @@ j_item_dedup_get_modification_time (JItemDedup* item)
 guint64
 j_item_dedup_get_optimal_access_size (JItemDedup* item)
 {
-	g_return_val_if_fail(item != NULL, 0);
+    J_TRACE_FUNCTION(NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
-	j_trace_leave(G_STRFUNC);
+	g_return_val_if_fail(item != NULL, 0);
 
 	return 512 * 1024;
 }
@@ -858,17 +856,17 @@ j_item_dedup_get_optimal_access_size (JItemDedup* item)
 JItemDedup*
 j_item_dedup_new (JCollection* collection, gchar const* name, JDistribution* distribution)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	JItemDedup* item = NULL;
 	g_autofree gchar* path = NULL;
 
 	g_return_val_if_fail(collection != NULL, NULL);
 	g_return_val_if_fail(name != NULL, NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
-
 	if (strpbrk(name, "/") != NULL)
 	{
-		goto end;
+		return NULL;
 	}
 
 	item = g_slice_new(JItemDedup);
@@ -887,10 +885,6 @@ j_item_dedup_new (JCollection* collection, gchar const* name, JDistribution* dis
 	path = g_build_path("/", j_collection_get_name(item->collection), item->name, NULL);
 	item->kv = j_kv_new("items", path);
 	item->kv_h = j_kv_new("item_hashes", path);
-
-end:
-	j_trace_leave(G_STRFUNC);
-
 	return item;
 }
 
@@ -920,13 +914,13 @@ void j_item_set_chunk_size(JItemDedup* item, guint64 chunk_size)
 JItemDedup*
 j_item_dedup_new_from_bson (JCollection* collection, bson_t const* b)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	JItemDedup* item;
 	g_autofree gchar* path = NULL;
 
 	g_return_val_if_fail(collection != NULL, NULL);
 	g_return_val_if_fail(b != NULL, NULL);
-
-	j_trace_enter(G_STRFUNC, NULL);
 
 	item = g_slice_new(JItemDedup);
 	item->name = NULL;
@@ -942,8 +936,6 @@ j_item_dedup_new_from_bson (JCollection* collection, bson_t const* b)
 	path = g_build_path("/", j_collection_get_name(item->collection), item->name, NULL);
 	item->kv = j_kv_new("items", path);
 	item->kv_h = j_kv_new("item_hashes", path);
-
-	j_trace_leave(G_STRFUNC);
 
 	return item;
 }
@@ -967,9 +959,6 @@ j_item_dedup_get_collection (JItemDedup* item)
 {
 	g_return_val_if_fail(item != NULL, NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
-	j_trace_leave(G_STRFUNC);
-
 	return item->collection;
 }
 
@@ -990,10 +979,9 @@ j_item_dedup_get_collection (JItemDedup* item)
 JCredentials*
 j_item_dedup_get_credentials (JItemDedup* item)
 {
-	g_return_val_if_fail(item != NULL, NULL);
+    J_TRACE_FUNCTION(NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
-	j_trace_leave(G_STRFUNC);
+	g_return_val_if_fail(item != NULL, NULL);
 
 	return item->credentials;
 }
@@ -1016,12 +1004,12 @@ j_item_dedup_get_credentials (JItemDedup* item)
 bson_t*
 j_item_dedup_serialize (JItemDedup* item, JSemantics* semantics)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	bson_t* b;
 	bson_t* b_cred;
 
 	g_return_val_if_fail(item != NULL, NULL);
-
-	j_trace_enter(G_STRFUNC, NULL);
 
 	b = bson_new();
 	b_cred = j_credentials_serialize(item->credentials);
@@ -1049,9 +1037,6 @@ j_item_dedup_serialize (JItemDedup* item, JSemantics* semantics)
 	//bson_finish(b);
 
 	bson_destroy(b_cred);
-
-	j_trace_leave(G_STRFUNC);
-
 	return b;
 }
 
@@ -1059,12 +1044,13 @@ static
 void
 j_item_deserialize_status (JItemDedup* item, bson_t const* b)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	bson_iter_t iterator;
 
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(b != NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
 
 	bson_iter_init(&iterator, b);
 
@@ -1085,8 +1071,6 @@ j_item_deserialize_status (JItemDedup* item, bson_t const* b)
 			item->status.age = g_get_real_time();
 		}
 	}
-
-	j_trace_leave(G_STRFUNC);
 }
 
 /**
@@ -1105,12 +1089,12 @@ j_item_deserialize_status (JItemDedup* item, bson_t const* b)
 void
 j_item_dedup_deserialize (JItemDedup* item, bson_t const* b)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	bson_iter_t iterator;
 
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(b != NULL);
-
-	j_trace_enter(G_STRFUNC, NULL);
 
 	bson_iter_init(&iterator, b);
 
@@ -1152,8 +1136,6 @@ j_item_dedup_deserialize (JItemDedup* item, bson_t const* b)
 			bson_destroy(b_cred);
 		}
 	}
-
-	j_trace_leave(G_STRFUNC);
 }
 
 /**
@@ -1173,10 +1155,9 @@ j_item_dedup_deserialize (JItemDedup* item, bson_t const* b)
 bson_oid_t const*
 j_item_dedup_get_id (JItemDedup* item)
 {
-	g_return_val_if_fail(item != NULL, NULL);
-
-	j_trace_enter(G_STRFUNC, NULL);
-	j_trace_leave(G_STRFUNC);
+    J_TRACE_FUNCTION(NULL);
+    
+    g_return_val_if_fail(item != NULL, NULL);
 
 	return &(item->id);
 }
@@ -1195,12 +1176,12 @@ j_item_dedup_get_id (JItemDedup* item)
 void
 j_item_dedup_set_modification_time (JItemDedup* item, gint64 modification_time)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	g_return_if_fail(item != NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
 	item->status.age = g_get_real_time();
 	item->status.modification_time = MAX(item->status.modification_time, modification_time);
-	j_trace_leave(G_STRFUNC);
 }
 
 /**
@@ -1217,10 +1198,10 @@ j_item_dedup_set_modification_time (JItemDedup* item, gint64 modification_time)
 void
 j_item_dedup_set_size (JItemDedup* item, guint64 size)
 {
+    J_TRACE_FUNCTION(NULL);
+
 	g_return_if_fail(item != NULL);
 
-	j_trace_enter(G_STRFUNC, NULL);
 	item->status.age = g_get_real_time();
 	item->status.size = size;
-	j_trace_leave(G_STRFUNC);
 }

@@ -66,6 +66,7 @@ main(int argc, char** argv)
 	test_item_collection();
 	test_item_collection_iterator();
 	test_item_item();
+	test_item_dedup();
 	test_item_item_iterator();
 	test_item_uri();
 

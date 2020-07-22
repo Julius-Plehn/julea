@@ -44,6 +44,7 @@ void test_db_db(void);
 void test_item_collection(void);
 void test_item_collection_iterator(void);
 void test_item_item(void);
+void test_item_dedup(void);
 void test_item_item_iterator(void);
 void test_item_uri(void);
 
