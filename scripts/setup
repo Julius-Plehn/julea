@@ -141,12 +141,10 @@ setup_start ()
 	local port_option
 
 	servers="$(get_servers | sort --unique)"
-
 	for server in ${servers}
 	do
 		host="$(get_host "${server}")"
 		port="$(get_port "${server}")"
-
 		if test "${host}" = "${HOSTNAME}"
 		then
 			port_option=''
