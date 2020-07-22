@@ -37,15 +37,16 @@ enum hashing_algorithms
 	J_HASH_XXHASH
 };
 
-typedef struct{
+typedef struct
+{
 	void* (*create_context)(void);
-	int (*init)(void *ctx);
-	int (*update)(void *ctx, const void *data, size_t length);
-	int (*finalize)(void *ctx, gchar **hash);
-	int (*destroy)(void *ctx);
-	const char *name;
-  	enum hashing_algorithms hash_id;
-	
+	int (*init)(void* ctx);
+	int (*update)(void* ctx, const void* data, size_t length);
+	int (*finalize)(void* ctx, gchar** hash);
+	int (*destroy)(void* ctx);
+	const char* name;
+	enum hashing_algorithms hash_id;
+
 } jhash_algorithm;
 
 G_END_DECLS

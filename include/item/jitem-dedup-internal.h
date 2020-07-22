@@ -38,24 +38,24 @@
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL JItemDedup* j_item_dedup_new (JCollection*, gchar const*, JDistribution*);
-G_GNUC_INTERNAL JItemDedup* j_item_dedup_new_from_bson (JCollection*, bson_t const*);
+G_GNUC_INTERNAL JItemDedup* j_item_dedup_new(JCollection*, gchar const*, JDistribution*);
+G_GNUC_INTERNAL JItemDedup* j_item_dedup_new_from_bson(JCollection*, bson_t const*);
 
-G_GNUC_INTERNAL JCollection* j_item_dedup_get_collection (JItemDedup*);
+G_GNUC_INTERNAL JCollection* j_item_dedup_get_collection(JItemDedup*);
 
-G_GNUC_INTERNAL bson_t* j_item_dedup_serialize (JItemDedup*, JSemantics*);
-G_GNUC_INTERNAL void j_item_dedup_deserialize (JItemDedup*, bson_t const*);
+G_GNUC_INTERNAL bson_t* j_item_dedup_serialize(JItemDedup*, JSemantics*);
+G_GNUC_INTERNAL void j_item_dedup_deserialize(JItemDedup*, bson_t const*);
 
-G_GNUC_INTERNAL bson_t* j_item_serialize_hashes (JItemDedup*);
-G_GNUC_INTERNAL void j_item_deserialize_hashes (JItemDedup*, bson_t const*);
-G_GNUC_INTERNAL void j_item_refresh_hashes (JItemDedup*, JSemantics*);
+G_GNUC_INTERNAL bson_t* j_item_serialize_hashes(JItemDedup*);
+G_GNUC_INTERNAL void j_item_deserialize_hashes(JItemDedup*, bson_t const*);
+G_GNUC_INTERNAL void j_item_refresh_hashes(JItemDedup*, JSemantics*);
 
-G_GNUC_INTERNAL bson_oid_t const* j_item_dedup_get_id (JItemDedup*);
+G_GNUC_INTERNAL bson_oid_t const* j_item_dedup_get_id(JItemDedup*);
 
-G_GNUC_INTERNAL gboolean j_item_dedup_get_exec (JList*, JSemantics*);
+G_GNUC_INTERNAL gboolean j_item_dedup_get_exec(JList*, JSemantics*);
 
-G_GNUC_INTERNAL void j_item_dedup_set_modification_time (JItemDedup*, gint64);
-G_GNUC_INTERNAL void j_item_dedup_set_size (JItemDedup*, guint64);
+G_GNUC_INTERNAL void j_item_dedup_set_modification_time(JItemDedup*, gint64);
+G_GNUC_INTERNAL void j_item_dedup_set_size(JItemDedup*, guint64);
 
 G_END_DECLS
 
