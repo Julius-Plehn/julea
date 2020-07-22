@@ -52,7 +52,7 @@ static
 void
 test_item_dedup_new_free (void)
 {
-	guint const n = 100000;
+	guint const n = 1;
 
 	for (guint i = 0; i < n; i++)
 	{
@@ -107,11 +107,87 @@ test_item_dedup_modification_time (JItemDedup** item, gconstpointer data)
 	g_assert_cmpuint(j_item_dedup_get_modification_time(*item), >, 0);
 }
 
+static
+void
+test_example (void)
+{
+	guint const n = 1;
+
+	for (guint i = 0; i < n; i++)
+	{
+		g_autoptr(JBatch) batch = NULL;
+		g_autoptr(JCollection) collection = NULL;
+		g_autoptr(JItemDedup) item = NULL;
+		const char data[] = "1234567887654321"; //test-data-12345
+		printf("sizeof(data): %lu\n", sizeof(data));
+		char data2[sizeof(data)];
+		char data3[3];
+		const char fortytwo[] = "42";
+		guint64 bytes_written = 0;
+		guint64 bytes_read = 0;
+
+		batch = j_batch_new_for_template(J_SEMANTICS_TEMPLATE_DEFAULT);
+		collection = j_collection_create("test-collection", batch);
+		item = j_item_dedup_create(collection, "test-item", NULL, batch);
+		j_batch_execute(batch);
+
+		printf("before write: data: %s\n", data);
+
+		// strings und ihr doofer \0 terminator >.<
+		printf("\nTEST: write 2 full chunks\n");
+		j_item_dedup_write(item, &data, sizeof(data)-1, 0, &bytes_written, batch);
+		j_batch_execute(batch);
+		printf("bytes_written: %lu\n", bytes_written);
+
+		printf("\nTEST: read 2 full chunks\n");
+		j_item_dedup_read(item, data2, 16, 0, &bytes_read, batch);
+		j_batch_execute(batch);
+		data2[sizeof(data)-1] = '\0';
+		printf("bytes_read: %lu\n", bytes_read);
+		printf("after read: data: %s\n", data2);
+
+		printf("\nTEST: read 2 chars\n");
+		j_item_dedup_read(item, data3, 2, 7, &bytes_read, batch);
+		j_batch_execute(batch);
+		data3[2] = '\0';
+		printf("bytes_read: %lu\n", bytes_read);
+		printf("after read: data: %s\n", data3);
+
+		printf("\nTEST: overwrite 2 chars\n");
+		printf("before write: data: %s\n", fortytwo);
+		bytes_written = 0;
+		j_item_dedup_write(item, &fortytwo, 2, 0, &bytes_written, batch);
+		j_batch_execute(batch);
+		printf("bytes_written: %lu\n", bytes_written);
+
+		memset(data2, '0', 16);
+		printf("\nTEST: read 2 full chunks\n");
+		j_item_dedup_read(item, data2, 16, 0, &bytes_read, batch);
+		j_batch_execute(batch);
+		data2[16] = '\0';
+		printf("bytes_read: %lu\n", bytes_read);
+		printf("after read: data: %s\n", data2);
+
+		memset(data2, '0', 16);
+		printf("\nTEST: read 3 bytes of 1 chunks\n");
+		j_item_dedup_read(item, data2, 3, 0, &bytes_read, batch);
+		j_batch_execute(batch);
+		data2[16] = '\0';
+		printf("bytes_read: %lu\n", bytes_read);
+		printf("after read: data: %s\n", data2);
+
+		j_item_dedup_delete(item, batch);
+		j_batch_execute(batch);
+
+		g_assert(item != NULL);
+	}
+}
 
 void
 test_item_dedup (void)
 {
 	g_test_add_func("/item/item_dedup/new_free", test_item_dedup_new_free);
+    g_test_add_func("/item/item_dedup/test_example", test_example);
     g_test_add("/item/item_dedup/ref_unref", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_ref_unref, test_item_dedup_fixture_teardown);
 	g_test_add("/item/item_dedup/name", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_name, test_item_dedup_fixture_teardown);
 	g_test_add("/item/item_dedup/size", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_size, test_item_dedup_fixture_teardown);

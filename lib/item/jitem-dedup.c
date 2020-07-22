@@ -259,6 +259,13 @@ j_item_dedup_create (JCollection* collection, gchar const* name, JDistribution* 
 	}
 
     tmp = j_item_dedup_serialize(item, j_batch_get_semantics(batch));
+
+    /*
+    gchar* json = bson_as_canonical_extended_json(tmp, NULL);
+	g_print("JSON dings: %s\n", json);
+	bson_free(json);
+    */
+
 	value = bson_destroy_with_steal(tmp, TRUE, &len);
 
 	//j_distributed_object_create(item->object, batch);
@@ -319,15 +326,36 @@ j_item_dedup_get (JCollection* collection, JItemDedup** item, gchar const* name,
 	j_kv_get_callback(kv, j_item_dedup_get_callback, data, batch);
 }
 
+/*
+	JItemGetData* data = data_;
+	bson_t tmp[1];
+
+	bson_init_static(tmp, value, len);
+	*(data->item) = j_item_new_from_bson(data->collection, tmp);
+
+	j_collection_unref(data->collection);
+	g_slice_free(JItemGetData, data);
+
+	g_free(value);
+*/
 static
 void
 j_item_hash_ref_callback (gpointer value, guint32 len, gpointer data_)
 {
 	bson_iter_t iter;
+    bson_t tmp[1];
 	guint32* refcount = data_;
 
-	if (bson_iter_init_find(&iter, value, "ref"))
+    bson_init_static(tmp, value, len);
+    
+    gchar* json = bson_as_canonical_extended_json(tmp, NULL);
+	g_print("JSON dings: %s\n", json);
+	bson_free(json);
+    
+
+	if (bson_iter_init_find(&iter, tmp, "ref"))
 		*refcount = (guint32)bson_iter_int32(&iter);
+    g_free(value);
 }
 
 //TODO should only be called with chunk_lock held but chunk_lock not
@@ -352,7 +380,12 @@ j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
 	{
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount);
-		j_kv_put(chunk_kv, new_ref_bson, new_ref_bson->len, bson_free, sub_batch);
+
+        gpointer value;
+	    guint32 value_len;
+        value = bson_destroy_with_steal(new_ref_bson, TRUE, &value_len);
+
+		j_kv_put(chunk_kv, value, value_len, bson_free, sub_batch);
 		j_batch_execute(sub_batch);
 	}
 	else
@@ -473,21 +506,20 @@ j_item_refresh_hashes (JItemDedup* item, JSemantics* semantics)
     bson_t data[1];
 
 	j_kv_get(item->kv_h, &b, &len, sub_batch);
-	j_batch_execute(sub_batch);
+	g_assert_true(j_batch_execute(sub_batch));
+    
+    bson_init_static(data, b, len);
+    json = bson_as_canonical_extended_json(data, NULL);
+    g_print("JSON refreshed %s\n", json);
+    bson_free(json);
+    
 
-	json = bson_as_canonical_extended_json(b, NULL);
-	g_print("JSON refreshed %s\n", json);
-	bson_free(json);
-
-	bson_init_static(data, b, len);
-
-	// apparently an empty bson has len == 5
-	if (data->len > 5)
-		j_item_deserialize_hashes(item, data);
-
+    // apparently an empty bson has len == 5
+    if (data->len > 5)
+        j_item_deserialize_hashes(item, data);
+    
 	bson_free(b);
     bson_destroy(data);
-	g_free(b);
 }
 /**
  * Reads an item.
@@ -596,7 +628,8 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 	hash_choice = J_HASH_SHA256;
 	// refresh chunks before write
-	j_item_refresh_hashes(item, j_batch_get_semantics(batch));
+    // TODO: Batch won't execute
+	//j_item_refresh_hashes(item, j_batch_get_semantics(batch));
 
 	// needs to be modified for non static hashing
 	first_chunk = offset / item->chunk_size;
@@ -715,7 +748,12 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount+1);
-		j_kv_put(chunk_kv, new_ref_bson, new_ref_bson->len, bson_free, sub_batch);
+
+        gpointer value;
+	    guint32 value_len;
+        value = bson_destroy_with_steal(new_ref_bson, TRUE, &value_len);
+
+		j_kv_put(chunk_kv, value, value_len, bson_free, sub_batch);
 		j_batch_execute(sub_batch);
 
 		if (chunk < old_chunks)
@@ -736,7 +774,11 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 	j_kv_delete(item->kv_h, sub_batch);
     serializes_bson = j_item_serialize_hashes(item);
-	j_kv_put(item->kv_h, serializes_bson, serializes_bson->len, bson_free, sub_batch);
+
+    gpointer value;
+	guint32 value_len;
+    value = bson_destroy_with_steal(serializes_bson, TRUE, &value_len);
+	j_kv_put(item->kv_h, value, value_len, bson_free, sub_batch);
 	j_batch_execute(sub_batch);
 }
 
@@ -1075,13 +1117,6 @@ j_item_deserialize_status (JItemDedup* item, bson_t const* b)
 
 /**
  * Deserializes an item.
- *
- * \private
- *
- * \author Michael Kuhn
- *
- * \code
- * \endcode
  *
  * \param item An item.
  * \param b    A BSON object.
