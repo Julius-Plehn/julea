@@ -51,6 +51,8 @@
 #include <core/jsemantics.h>
 #include <core/jstatistics.h>
 #include <core/jtrace.h>
+#include <core/hashing/jhash_impl.h>
+#include <core/hashing/jhash_sha256.h>
 
 #undef JULEA_H
 
