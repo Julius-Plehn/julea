@@ -43,28 +43,28 @@ G_END_DECLS
 
 G_BEGIN_DECLS
 
-JItemDedup* j_item_dedup_ref (JItemDedup*);
-void j_item_dedup_unref (JItemDedup*);
+JItemDedup* j_item_dedup_ref(JItemDedup*);
+void j_item_dedup_unref(JItemDedup*);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(JItemDedup, j_item_dedup_unref)
 
-gchar const* j_item_dedup_get_name (JItemDedup*);
-JCredentials* j_item_dedup_get_credentials (JItemDedup*);
+gchar const* j_item_dedup_get_name(JItemDedup*);
+JCredentials* j_item_dedup_get_credentials(JItemDedup*);
 
-JItemDedup* j_item_dedup_create (JCollection*, gchar const*, JDistribution*, JBatch*);
-void j_item_dedup_delete (JItemDedup*, JBatch*);
-void j_item_dedup_get (JCollection*, JItemDedup**, gchar const*, JBatch*);
+JItemDedup* j_item_dedup_create(JCollection*, gchar const*, JDistribution*, JBatch*);
+void j_item_dedup_delete(JItemDedup*, JBatch*);
+void j_item_dedup_get(JCollection*, JItemDedup**, gchar const*, JBatch*);
 
-void j_item_dedup_read (JItemDedup*, gpointer, guint64, guint64, guint64*, JBatch*);
-void j_item_dedup_write (JItemDedup*, gconstpointer, guint64, guint64, guint64*, JBatch*);
+void j_item_dedup_read(JItemDedup*, gpointer, guint64, guint64, guint64*, JBatch*);
+void j_item_dedup_write(JItemDedup*, gconstpointer, guint64, guint64, guint64*, JBatch*);
 
-void j_item_dedup_get_status (JItemDedup*, JBatch*);
+void j_item_dedup_get_status(JItemDedup*, JBatch*);
 void j_item_set_chunk_size(JItemDedup* item, guint64 chunk_size);
 
-guint64 j_item_dedup_get_size (JItemDedup*);
-gint64 j_item_dedup_get_modification_time (JItemDedup*);
+guint64 j_item_dedup_get_size(JItemDedup*);
+gint64 j_item_dedup_get_modification_time(JItemDedup*);
 
-guint64 j_item_dedup_get_optimal_access_size (JItemDedup*);
+guint64 j_item_dedup_get_optimal_access_size(JItemDedup*);
 
 G_END_DECLS
 
