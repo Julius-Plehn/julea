@@ -80,7 +80,7 @@ struct JItemDedup
 
 	JCredentials* credentials;
 
-    //JDistribution* distribution;
+    JDistribution* distribution;
 
 	JKV* kv;
 	JKV* kv_h;
@@ -358,17 +358,18 @@ j_item_hash_ref_callback (gpointer value, guint32 len, gpointer data_)
 //implemented yet
 static
 void
-j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
+j_item_unref_chunk (gchar* hash, JBatch* batch)
 {
 	JKV* chunk_kv;
 	JObject* chunk_obj;
 	guint64 refcount = 0;
 	JBatch* sub_batch = j_batch_new(j_batch_get_semantics(batch));
 	bson_t* new_ref_bson;
+    gboolean ret;
 
 	chunk_kv = j_kv_new("chunk_refs", (const gchar*)hash);
 	j_kv_get_callback(chunk_kv, j_item_hash_ref_callback, &refcount, sub_batch);
-	g_assert(j_batch_execute(sub_batch));
+	ret = j_batch_execute(sub_batch);
 
 	refcount -= 1;
 
@@ -377,12 +378,14 @@ j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount);
 
+        {
         gpointer value;
 	    guint32 value_len;
         value = bson_destroy_with_steal(new_ref_bson, TRUE, &value_len);
-
+    
 		j_kv_put(chunk_kv, value, value_len, bson_free, sub_batch);
-		g_assert(j_batch_execute(sub_batch));
+        }
+		ret = j_batch_execute(sub_batch);
 	}
 	else
 	{
@@ -391,6 +394,12 @@ j_item_unref_chunk (JItemDedup* item, gchar* hash, JBatch* batch)
 		j_object_delete(chunk_obj, batch);
 		j_object_unref(chunk_obj);
 	}
+
+    //TODO: ??
+    if(!ret)
+    {
+
+    }
 }
 
 /**
@@ -421,11 +430,10 @@ j_item_dedup_delete (JItemDedup* item, JBatch* batch)
 	for (guint64 i = 0; i < item->hashes->len; i++)
 	{
 		gchar* hash = g_array_index(item->hashes, gchar*, i);
-		j_item_unref_chunk(item, hash, batch);
+		j_item_unref_chunk(hash, batch);
 		g_array_remove_index(item->hashes, i);
 		g_free(hash);
 	}
-
 }
 
 bson_t*
@@ -448,10 +456,11 @@ j_item_serialize_hashes (JItemDedup* item)
 		bson_append_utf8(b, key, -1, g_array_index(item->hashes, gchar*, i), 64);
 		g_free(key);
 	}
+    /*
 	gchar* json = bson_as_canonical_extended_json(b, NULL);
-	//g_print("JSON read %s\n", json);
+	g_print("JSON read %s\n", json);
 	bson_free(json);
-
+    */
 	return b;
 }
 
@@ -620,6 +629,7 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 	JBatch* sub_batch;
 	void* hash_context;
 	int hash_choice;
+    gboolean ret;
 
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(data != NULL);
@@ -685,7 +695,7 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 		last_buf = g_slice_alloc0(remaining);
 	}
 
-	g_assert(j_batch_execute(sub_batch));
+	ret = j_batch_execute(sub_batch);    
 
  	hash_context = algo_array[hash_choice]->create_context();
 
@@ -721,7 +731,7 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 		chunk_kv = j_kv_new("chunk_refs", (const gchar*)hash);
 		j_kv_get_callback(chunk_kv, j_item_hash_ref_callback, &refcount, sub_batch);
-		g_assert(j_batch_execute(sub_batch));
+		ret = j_batch_execute(sub_batch);
 
 
 		if (refcount == 0)
@@ -747,20 +757,22 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount+1);
-        
+
+        {
         gpointer value;
 	    guint32 value_len;
         value = bson_destroy_with_steal(new_ref_bson, TRUE, &value_len);
 
 		j_kv_put(chunk_kv, value, value_len, bson_free, sub_batch);
-		g_assert(j_batch_execute(sub_batch));
+        }
+		ret = j_batch_execute(sub_batch);
 
 		if (chunk < old_chunks)
 		{
 			gchar* old_hash = g_array_index(item->hashes, gchar*, chunk);
 			if (g_strcmp0(old_hash, (gchar*)hash) != 0)
 			{
-				j_item_unref_chunk(item, old_hash, batch);
+				j_item_unref_chunk(old_hash, batch);
 				g_array_remove_index(item->hashes, chunk);
 				g_free(old_hash);
 			}
@@ -779,7 +791,13 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 	guint32 value_len;
     value = bson_destroy_with_steal(serializes_bson, TRUE, &value_len);
 	j_kv_put(item->kv_h, value, value_len, bson_free, sub_batch);
-	g_assert(j_batch_execute(sub_batch));
+	ret = j_batch_execute(sub_batch);
+    }
+
+    //TODO: ??
+    if(!ret)
+    {
+        
     }
 }
 
@@ -916,6 +934,7 @@ j_item_dedup_new (JCollection* collection, gchar const* name, JDistribution* dis
 	bson_oid_init(&(item->id), bson_context_get_default());
 	item->name = g_strdup(name);
 	item->credentials = j_credentials_new();
+    item->distribution = distribution;
 	item->status.age = g_get_real_time();
 	item->status.size = 0;
 	item->status.modification_time = g_get_real_time();
