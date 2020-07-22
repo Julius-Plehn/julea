@@ -34,13 +34,13 @@ G_BEGIN_DECLS
 
 void* sha256_context(void);
 
-int sha256_init(void *ctx);
+int sha256_init(void* ctx);
 
-int sha256_update(void *ctx, const void *data, size_t length);
+int sha256_update(void* ctx, const void* data, size_t length);
 
-int sha256_finalize(void *ctx, gchar **hash);
+int sha256_finalize(void* ctx, gchar** hash);
 
-int sha256_destroy(void *ctx);
+int sha256_destroy(void* ctx);
 
 extern jhash_algorithm hash_sha256;
 

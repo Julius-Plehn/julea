@@ -274,7 +274,7 @@ j_batch_execute(JBatch* batch)
 	}
 
 	j_operation_cache_flush();
-	
+
 	ret = j_batch_execute_internal(batch);
 	j_list_delete_all(batch->list);
 
