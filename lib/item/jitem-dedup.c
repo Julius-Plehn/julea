@@ -348,11 +348,6 @@ j_item_hash_ref_callback (gpointer value, guint32 len, gpointer data_)
 
     bson_init_static(tmp, value, len);
     
-    gchar* json = bson_as_canonical_extended_json(tmp, NULL);
-	g_print("JSON dings: %s\n", json);
-	bson_free(json);
-    
-
 	if (bson_iter_init_find(&iter, tmp, "ref"))
 		*refcount = (guint32)bson_iter_int32(&iter);
     g_free(value);
@@ -509,10 +504,11 @@ j_item_refresh_hashes (JItemDedup* item, JSemantics* semantics)
 	g_assert_true(j_batch_execute(sub_batch));
     
     bson_init_static(data, b, len);
+    /*
     json = bson_as_canonical_extended_json(data, NULL);
     g_print("JSON refreshed %s\n", json);
     bson_free(json);
-    
+    */
 
     // apparently an empty bson has len == 5
     if (data->len > 5)
@@ -613,7 +609,7 @@ j_item_dedup_write (JItemDedup* item, gconstpointer data, guint64 length, guint6
 
 	guint64 first_chunk, chunk_offset, chunks, old_chunks, hash_len, remaining, bytes_read;
 	GArray* hashes;
-	gpointer first_buf, last_buf; // was wohl der type von last_buf ist :thinking:
+	gpointer first_buf = NULL, last_buf = NULL; // was wohl der type von last_buf ist :thinking:
 	JObject *first_obj, *last_obj, *chunk_obj;
 	JKV *chunk_kv;
 	bson_t *new_ref_bson;
