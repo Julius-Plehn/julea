@@ -834,7 +834,7 @@ j_item_dedup_get_status(JItemDedup* item, JBatch* batch)
 	g_return_if_fail(item != NULL);
 
 	// TODO: find a meaningful way to do this for chunks
-	// j_object_status(item->object, &(item->status.modification_time), &(item->status.size), batch);
+	//j_object_status(item->object, &(item->status.modification_time), &(item->status.size), batch);
 	(void)batch;
 }
 

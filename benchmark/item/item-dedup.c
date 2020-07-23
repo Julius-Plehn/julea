@@ -230,6 +230,7 @@ benchmark_item_dedup_delete_batch_without_get(BenchmarkRun* run)
 	run->operations = n;
 }
 
+/*
 static void
 _benchmark_item_dedup_get_status(BenchmarkRun* run, gboolean use_batch)
 {
@@ -298,6 +299,7 @@ benchmark_item_dedup_get_status_batch(BenchmarkRun* run)
 {
 	_benchmark_item_dedup_get_status(run, TRUE);
 }
+*/
 
 static void
 _benchmark_item_dedup_read(BenchmarkRun* run, gboolean use_batch, guint block_size)
