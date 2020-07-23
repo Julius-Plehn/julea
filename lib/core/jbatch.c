@@ -264,6 +264,7 @@ j_batch_execute(JBatch* batch)
 
 	if (j_list_length(batch->list) == 0)
 	{
+		//g_printerr("j_list_length(batch->list) == 0\n");
 		return FALSE;
 	}
 

@@ -132,6 +132,7 @@ test_example(void)
 		j_item_dedup_write(item, &data, sizeof(data) - 1, 0, &bytes_written, batch);
 		ret = j_batch_execute(batch);
 		printf("bytes_written: %lu\n", bytes_written);
+		printf("Item Size: %ld\n", j_item_dedup_get_size(item));
 
 		printf("\nTEST: read 2 full chunks\n");
 		j_item_dedup_read(item, data2, 16, 0, &bytes_read, batch);

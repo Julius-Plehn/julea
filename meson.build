@@ -529,6 +529,7 @@ julea_benchmark_srcs = files([
 	'benchmark/hdf5/hdf.c',
 	'benchmark/item/collection.c',
 	'benchmark/item/item.c',
+	'benchmark/item/item-dedup.c',
 	'benchmark/kv/kv.c',
 	'benchmark/memory-chunk.c',
 	'benchmark/message.c',
