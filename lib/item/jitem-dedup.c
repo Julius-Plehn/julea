@@ -501,9 +501,14 @@ j_item_refresh_hashes(JItemDedup* item, JSemantics* semantics)
 	gpointer b;
 	guint32 len;
 	bson_t data[1];
-
+	gboolean ret;
 	j_kv_get(item->kv_h, &b, &len, sub_batch);
-	g_assert_true(j_batch_execute(sub_batch));
+	ret = j_batch_execute(sub_batch);
+	if (!ret)
+	{
+		return;
+	}
+	g_assert_nonnull(b);
 
 	bson_init_static(data, b, len);
 	/*
@@ -511,15 +516,19 @@ j_item_refresh_hashes(JItemDedup* item, JSemantics* semantics)
     g_print("JSON refreshed %s\n", json);
     bson_free(json);
     */
-
+	//g_printerr("data->len: %d\n", data->len);
 	// apparently an empty bson has len == 5
 	if (data->len > 5)
 	{
 		j_item_deserialize_hashes(item, data);
 	}
-
-	bson_free(b);
 	bson_destroy(data);
+	g_free(b);
+
+	if (!ret)
+	{
+		//FIXME
+	}
 }
 /**
  * Reads an item.
@@ -561,7 +570,7 @@ j_item_dedup_read(JItemDedup* item, gpointer data, guint64 length, guint64 offse
 	{
 		guint64 from, to, part;
 		const gchar* hash = g_array_index(item->hashes, gchar*, chunk);
-		printf("Read Hash: %s\n", hash);
+		//printf("Read Hash: %s\n", hash);
 		chunk_obj = j_object_new("chunks", hash);
 		j_object_create(chunk_obj, batch);
 		from = 0;
@@ -581,7 +590,7 @@ j_item_dedup_read(JItemDedup* item, gpointer data, guint64 length, guint64 offse
 			}
 		}
 		part = to - from;
-		printf("From: %ld | To: %ld | Length: %ld\n", from, to, part);
+		//printf("From: %ld | To: %ld | Length: %ld\n", from, to, part);
 		j_object_read(chunk_obj, (gchar*)data + destination_relative, part, from, bytes_read, batch);
 		destination_relative += part;
 	}
@@ -648,7 +657,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	printf("remaining: %ld\n", remaining);
 	printf("Length: %ld\n", length);
 	*/
-	printf("chunks;%ld\n", chunks);
+	printf("chunks:%ld\n", chunks);
 	hash_len = g_array_get_element_size(item->hashes);
 
 	old_chunks = MIN(0, MIN(chunks, item->hashes->len - first_chunk));
@@ -718,7 +727,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		}
 		//EVP_DigestFinal_ex(hash_context, hash_gen, &md_len);
 		algo_array[hash_choice]->finalize(hash_context, &hash);
-		printf("Write Hash: %s\n", hash);
+		//printf("Write Hash: %s\n", hash);
 
 		chunk_kv = j_kv_new("chunk_refs", (const gchar*)hash);
 		j_kv_get_callback(chunk_kv, j_item_hash_ref_callback, &refcount, sub_batch);
@@ -743,6 +752,23 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 				j_object_write(chunk_obj, last_buf, remaining, item->chunk_size - remaining, bytes_written, batch);
 			}
 		}
+		/*
+        //FIXME
+        else{
+            if (chunk == 0 && chunk_offset > 0)
+			{
+                j_helper_atomic_add(bytes_written, chunk_offset);
+
+			}
+
+            j_helper_atomic_add(bytes_written, len);
+
+			if (chunk == chunks - 1 && remaining > 0)
+			{
+                j_helper_atomic_add(bytes_written, remaining);
+			}
+        }
+        */
 
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount + 1);
@@ -918,6 +944,11 @@ j_item_dedup_new(JCollection* collection, gchar const* name, JDistribution* dist
 		return NULL;
 	}
 
+	if (distribution == NULL)
+	{
+		distribution = j_distribution_new(J_DISTRIBUTION_ROUND_ROBIN);
+	}
+
 	item = g_slice_new(JItemDedup);
 	bson_oid_init(&(item->id), bson_context_get_default());
 	item->name = g_strdup(name);
@@ -930,7 +961,7 @@ j_item_dedup_new(JCollection* collection, gchar const* name, JDistribution* dist
 	item->ref_count = 1;
 
 	item->hashes = g_array_new(FALSE, FALSE, sizeof(guchar*));
-	item->chunk_size = 8; // small size for testing only
+	item->chunk_size = 1024; // small size for testing only
 
 	path = g_build_path("/", j_collection_get_name(item->collection), item->name, NULL);
 	item->kv = j_kv_new("items", path);
@@ -1059,11 +1090,13 @@ j_item_dedup_serialize(JItemDedup* item, JSemantics* semantics)
 
 	bson_t* b;
 	bson_t* b_cred;
+	bson_t* b_distribution;
 
 	g_return_val_if_fail(item != NULL, NULL);
 
 	b = bson_new();
 	b_cred = j_credentials_serialize(item->credentials);
+	b_distribution = j_distribution_serialize(item->distribution);
 
 	bson_append_oid(b, "_id", -1, &(item->id));
 	bson_append_oid(b, "collection", -1, j_collection_get_id(item->collection));
@@ -1084,10 +1117,13 @@ j_item_dedup_serialize(JItemDedup* item, JSemantics* semantics)
 	}
 
 	bson_append_document(b, "credentials", -1, b_cred);
+	bson_append_document(b, "distribution", -1, b_distribution);
 
 	//bson_finish(b);
 
 	bson_destroy(b_cred);
+	bson_destroy(b_distribution);
+
 	return b;
 }
 
@@ -1176,6 +1212,22 @@ j_item_dedup_deserialize(JItemDedup* item, bson_t const* b)
 			bson_init_static(b_cred, data, len);
 			j_credentials_deserialize(item->credentials, b_cred);
 			bson_destroy(b_cred);
+		}
+		else if (g_strcmp0(key, "distribution") == 0)
+		{
+			guint8 const* data;
+			guint32 len;
+			bson_t b_distribution[1];
+
+			if (item->distribution != NULL)
+			{
+				j_distribution_unref(item->distribution);
+			}
+
+			bson_iter_document(&iterator, &len, &data);
+			bson_init_static(b_distribution, data, len);
+			item->distribution = j_distribution_new_from_bson(b_distribution);
+			bson_destroy(b_distribution);
 		}
 	}
 }

@@ -63,6 +63,7 @@ void benchmark_db_schema(void);
 
 void benchmark_collection(void);
 void benchmark_item(void);
+void benchmark_item_dedup(void);
 
 void benchmark_hdf(void);
 void benchmark_hdf_dai(void);
