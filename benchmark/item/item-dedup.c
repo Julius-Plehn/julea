@@ -330,6 +330,8 @@ _benchmark_item_dedup_read(BenchmarkRun* run, gboolean use_batch, guint block_si
 	g_assert_true(ret);
 	//g_assert_cmpuint(nb, ==, n * block_size);
 
+	g_printerr("physical_size: %ld\n", j_item_dedup_get_size_physical(item));
+
 	j_benchmark_timer_start(run);
 
 	while (j_benchmark_iterate(run))
