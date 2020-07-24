@@ -321,7 +321,7 @@ _benchmark_item_dedup_read(BenchmarkRun* run, gboolean use_batch, guint block_si
 
 	collection = j_collection_create("benchmark", batch);
 	item = j_item_dedup_create(collection, "benchmark", NULL, batch);
-
+	j_item_dedup_set_chunk_size(item, block_size);
 	for (guint i = 0; i < n; i++)
 	{
 		j_item_dedup_write(item, dummy, block_size, i * block_size, &nb, batch);
@@ -525,11 +525,14 @@ benchmark_item_dedup(void)
 	//	j_benchmark_add("/item/item-dedup/get-status", benchmark_item_dedup_get_status);
 	//	j_benchmark_add("/item/item-dedup/get-status-batch", benchmark_item_dedup_get_status_batch);
 	/* FIXME get */
+
 	j_benchmark_add("/item/item-dedup/read", benchmark_item_dedup_read);
+	/*
 	j_benchmark_add("/item/item-dedup/read-batch", benchmark_item_dedup_read_batch);
 	j_benchmark_add("/item/item-dedup/write", benchmark_item_dedup_write);
 	j_benchmark_add("/item/item-dedup/write-batch", benchmark_item_dedup_write_batch);
 
 	j_benchmark_add("/item/item-dedup/unordered-create-delete", benchmark_item_dedup_unordered_create_delete);
 	j_benchmark_add("/item/item-dedup/unordered-create-delete-batch", benchmark_item_dedup_unordered_create_delete_batch);
+    */
 }

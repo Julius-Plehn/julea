@@ -451,7 +451,6 @@ void
 j_item_deserialize_hashes(JItemDedup* item, bson_t const* b)
 {
 	J_TRACE_FUNCTION(NULL);
-
 	bson_iter_t iter;
 
 	guint len = 0;
@@ -494,12 +493,12 @@ j_item_refresh_hashes(JItemDedup* item, JSemantics* semantics)
 	gboolean ret;
 	j_kv_get(item->kv_h, &b, &len, sub_batch);
 	ret = j_batch_execute(sub_batch);
+
 	if (!ret)
 	{
 		return;
 	}
 	g_assert_nonnull(b);
-
 	bson_init_static(data, b, len);
 	/*
     json = bson_as_canonical_extended_json(data, NULL);
@@ -507,8 +506,7 @@ j_item_refresh_hashes(JItemDedup* item, JSemantics* semantics)
     bson_free(json);
     */
 	//g_printerr("data->len: %d\n", data->len);
-	// apparently an empty bson has len == 5
-	if (data->len > 5)
+	if (bson_empty(data))
 	{
 		j_item_deserialize_hashes(item, data);
 	}
@@ -624,7 +622,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	hash_choice = J_HASH_SHA256;
 	// refresh chunks before write
 	// TODO: Batch won't execute
-	//j_item_refresh_hashes(item, j_batch_get_semantics(batch));
+	j_item_refresh_hashes(item, j_batch_get_semantics(batch));
 
 	// needs to be modified for non static hashing
 	first_chunk = offset / item->chunk_size;
