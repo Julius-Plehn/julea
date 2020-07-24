@@ -156,8 +156,6 @@ j_item_dedup_ref(JItemDedup* item)
  * Decreases an item's reference count.
  * When the reference count reaches zero, frees the memory allocated for the item.
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -206,8 +204,6 @@ j_item_dedup_unref(JItemDedup* item)
 /**
  * Returns an item's name.
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -227,8 +223,6 @@ j_item_dedup_get_name(JItemDedup* item)
 
 /**
  * Creates an item in a collection.
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
@@ -290,8 +284,6 @@ j_item_dedup_get_callback(gpointer value, guint32 len, gpointer data_)
 
 /**
  * Gets an item from a collection.
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
@@ -398,8 +390,6 @@ j_item_unref_chunk(gchar* hash, JBatch* batch)
 
 /**
  * Deletes an item from a collection.
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
@@ -533,8 +523,6 @@ j_item_refresh_hashes(JItemDedup* item, JSemantics* semantics)
 /**
  * Reads an item.
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -601,8 +589,6 @@ j_item_dedup_read(JItemDedup* item, gpointer data, guint64 length, guint64 offse
  *
  * \note
  * j_item_write() modifies bytes_written even if j_batch_execute() is not called.
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
@@ -818,8 +804,6 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 /**
  * Get the status of an item.
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -841,8 +825,6 @@ j_item_dedup_get_status(JItemDedup* item, JBatch* batch)
 /**
  * Returns an item's size.
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -860,9 +842,37 @@ j_item_dedup_get_size(JItemDedup* item)
 }
 
 /**
- * Returns an item's modification time.
+ * Returns an item's physical size.
  *
- * \author Michael Kuhn
+ * \code
+ * \endcode
+ *
+ * \param item An item.
+ *
+ * \return A size.
+ **/
+guint64
+j_item_dedup_get_size_physical(JItemDedup* item)
+{
+	J_TRACE_FUNCTION(NULL);
+	GHashTable* table;
+	guint size;
+	g_return_val_if_fail(item != NULL, 0);
+
+	table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+	for (guint i = 0; i < item->hashes->len; ++i)
+	{
+		gchar* hash = g_array_index(item->hashes, gchar*, i);
+		g_hash_table_add(table, g_strdup(hash));
+	}
+
+	size = g_hash_table_size(table) * item->chunk_size;
+	g_hash_table_destroy(table);
+	return size;
+}
+
+/**
+ * Returns an item's modification time.
  *
  * \code
  * \endcode
@@ -883,8 +893,6 @@ j_item_dedup_get_modification_time(JItemDedup* item)
 
 /**
  * Returns the item's optimal access size.
- *
- * \author Michael Kuhn
  *
  * \code
  * JItemDedup* item;
@@ -914,8 +922,6 @@ j_item_dedup_get_optimal_access_size(JItemDedup* item)
 
 /**
  * Creates a new item.
- *
- * \author Michael Kuhn
  *
  * \code
  * JItemDedup* i;
@@ -970,7 +976,7 @@ j_item_dedup_new(JCollection* collection, gchar const* name, JDistribution* dist
 }
 
 void
-j_item_set_chunk_size(JItemDedup* item, guint64 chunk_size)
+j_item_dedup_set_chunk_size(JItemDedup* item, guint64 chunk_size)
 {
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(chunk_size > 0);
@@ -982,8 +988,6 @@ j_item_set_chunk_size(JItemDedup* item, guint64 chunk_size)
  * Creates a new item from a BSON object.
  *
  * \private
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
@@ -1027,8 +1031,6 @@ j_item_dedup_new_from_bson(JCollection* collection, bson_t const* b)
  *
  * \private
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -1048,8 +1050,6 @@ j_item_dedup_get_collection(JItemDedup* item)
  * Returns an item's credentials.
  *
  * \private
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
@@ -1072,8 +1072,6 @@ j_item_dedup_get_credentials(JItemDedup* item)
  * Serializes an item.
  *
  * \private
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
@@ -1237,8 +1235,6 @@ j_item_dedup_deserialize(JItemDedup* item, bson_t const* b)
  *
  * \private
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -1259,8 +1255,6 @@ j_item_dedup_get_id(JItemDedup* item)
 /**
  * Sets an item's modification time.
  *
- * \author Michael Kuhn
- *
  * \code
  * \endcode
  *
@@ -1280,8 +1274,6 @@ j_item_dedup_set_modification_time(JItemDedup* item, gint64 modification_time)
 
 /**
  * Sets an item's size.
- *
- * \author Michael Kuhn
  *
  * \code
  * \endcode
