@@ -24,7 +24,7 @@
 #include <glib.h>
 #include <glib/gi18n.h>
 
-#include <hashing/jhash_sha256.h>
+#include <jhash_sha256.h>
 
 void*
 sha256_context(void)
