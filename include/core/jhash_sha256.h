@@ -20,34 +20,29 @@
  * \file
  **/
 
-#ifndef JULEA_HASHING_IMPL_H
-#define JULEA_HASHING_IMPL_H
+#ifndef JULEA_HASH_SHA256_H
+#define JULEA_HASH_SHA256_H
 
 #if !defined(JULEA_H) && !defined(JULEA_COMPILATION)
 #error "Only <julea.h> can be included directly."
 #endif
 
 #include <glib.h>
+#include <core/jhash_impl.h>
 
 G_BEGIN_DECLS
 
-enum hashing_algorithms
-{
-	J_HASH_SHA256,
-	J_HASH_XXHASH
-};
+void* sha256_context(void);
 
-typedef struct
-{
-	void* (*create_context)(void);
-	int (*init)(void* ctx);
-	int (*update)(void* ctx, const void* data, size_t length);
-	int (*finalize)(void* ctx, gchar** hash);
-	int (*destroy)(void* ctx);
-	const char* name;
-	enum hashing_algorithms hash_id;
+int sha256_init(void* ctx);
 
-} jhash_algorithm;
+int sha256_update(void* ctx, const void* data, size_t length);
+
+int sha256_finalize(void* ctx, gchar** hash);
+
+int sha256_destroy(void* ctx);
+
+extern jhash_algorithm hash_sha256;
 
 G_END_DECLS
 

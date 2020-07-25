@@ -40,7 +40,7 @@
 
 #include <openssl/evp.h>
 
-#include <hashing/jhash_sha256.h>
+//#include <hashing/jhash_sha256.h>
 //#include <hashing/jhash_xxhash.h>
 
 static jhash_algorithm* algo_array[] = {

@@ -388,7 +388,7 @@ julea_srcs = files([
 	'lib/core/jsemantics.c',
 	'lib/core/jstatistics.c',
 	'lib/core/jtrace.c',
-	'lib/core/hashing/jhash_sha256.c',
+	'lib/core/jhash_sha256.c',
 ])
 
 julea_lib = shared_library('julea', julea_srcs,
@@ -755,8 +755,8 @@ julea_client_hdrs = {
 		'include/core/jsemantics.h',
 		'include/core/jstatistics.h',
 		'include/core/jtrace.h',
-		'include/core/hashing/jhash_impl.h',
-		'include/core/hashing/jhash_sha256.h',
+		'include/core/jhash_impl.h',
+		'include/core/jhash_sha256.h',
 	]),
 	'db': files([
 		'include/db/jdb-entry.h',
