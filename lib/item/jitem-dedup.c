@@ -614,7 +614,6 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	gboolean ret;
 	guint64 len;
 
-
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(data != NULL);
 	g_return_if_fail(bytes_written != NULL);
@@ -633,7 +632,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	remaining = chunks * item->chunk_size - chunk_offset - length;
 	len = item->chunk_size - chunk_offset - (chunks * item->chunk_size - chunk_offset - length);
 	//len = item->chunk_size - chunk_offset - remaining;
-	
+
 	printf("Chunk Size: %ld\n", item->chunk_size);
 	printf("First_chunk: %ld\n", first_chunk);
 	printf("Offset: %ld\n", offset);
