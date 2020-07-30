@@ -104,13 +104,15 @@ compressorFilter(unsigned int flags, size_t cd_nelmts,
 		batch = j_batch_new_for_template(J_SEMANTICS_TEMPLATE_DEFAULT);
 		collection = j_collection_create("test-collection", batch);
 		item = j_item_dedup_create(collection, item_name, NULL, batch);
-		j_item_dedup_set_chunk_size(item, 1024);
+		j_item_dedup_set_chunk_size(item, 128000);
 		j_batch_execute(batch);
 
 		j_item_dedup_write(item, *buf, nbytes, 0, &bytes_written, batch);
 		j_batch_execute(batch);
-		printf("nbytes: %lu\n", nbytes);
-		printf("physical_size: %ld\n", j_item_dedup_get_size_physical(item));
+		printf("nbytes|%lu\n", nbytes);
+		printf("physical_size|%ld\n", j_item_dedup_get_size_physical(item));
+		printf("bytes_written|%ld\n", bytes_written);
+
 		*buf = item_name;
 		return strlen(item_name);
 	}

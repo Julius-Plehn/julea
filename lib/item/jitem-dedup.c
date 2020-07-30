@@ -130,8 +130,6 @@ struct JItemDedup
 /**
  * Increases an item's reference count.
  *
- * \author Michael Kuhn
- *
  * \code
  * JItemDedup* i;
  *
@@ -605,7 +603,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 	guint64 first_chunk, chunk_offset, chunks, old_chunks, hash_len, remaining, bytes_read;
 	GArray* hashes;
-	gpointer first_buf = NULL, last_buf = NULL; // was wohl der type von last_buf ist :thinking:
+	gpointer first_buf = NULL, last_buf = NULL;
 	JObject *first_obj, *last_obj, *chunk_obj;
 	JKV* chunk_kv;
 	bson_t* new_ref_bson;
@@ -614,6 +612,8 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	void* hash_context;
 	int hash_choice;
 	gboolean ret;
+	guint64 len;
+
 
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(data != NULL);
@@ -621,7 +621,6 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 	hash_choice = J_HASH_SHA256;
 	// refresh chunks before write
-	// TODO: Batch won't execute
 	j_item_refresh_hashes(item, j_batch_get_semantics(batch));
 
 	// needs to be modified for non static hashing
@@ -632,7 +631,9 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		chunks++;
 	//last_chunk = first_chunk + chunks - 1; // might be unecesarry
 	remaining = chunks * item->chunk_size - chunk_offset - length;
-	/*
+	len = item->chunk_size - chunk_offset - (chunks * item->chunk_size - chunk_offset - length);
+	//len = item->chunk_size - chunk_offset - remaining;
+	
 	printf("Chunk Size: %ld\n", item->chunk_size);
 	printf("First_chunk: %ld\n", first_chunk);
 	printf("Offset: %ld\n", offset);
@@ -640,14 +641,19 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	printf("Chunks: %ld\n", chunks);
 	printf("remaining: %ld\n", remaining);
 	printf("Length: %ld\n", length);
-	*/
+	printf("Len: %ld\n", len);
+	printf("Hash Len: %d\n", item->hashes->len);
+
 	printf("chunks:%ld\n", chunks);
 	hash_len = g_array_get_element_size(item->hashes);
 
-	old_chunks = MIN(0, MIN(chunks, item->hashes->len - first_chunk));
+	old_chunks = MIN(chunks, item->hashes->len - first_chunk);
+	printf("old_chunks: %d\n", old_chunks);
+	/*
 	hashes = g_array_sized_new(FALSE, TRUE, hash_len, old_chunks);
 	g_array_insert_vals(hashes, 0, item->hashes->data, old_chunks * hash_len);
-
+	printf("g_array len: %d\n", hashes->len);
+	*/
 	sub_batch = j_batch_new(j_batch_get_semantics(batch));
 
 	// get old_chunks:
@@ -657,7 +663,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	{
 		// get offset part of first_chunk
 		first_buf = g_slice_alloc(chunk_offset);
-		first_obj = j_object_new("chunks", g_array_index(hashes, gchar*, 0));
+		first_obj = j_object_new("chunks", g_array_index(item->hashes, gchar*, 0));
 		j_object_create(first_obj, sub_batch);
 		j_object_read(first_obj, first_buf, chunk_offset, item->chunk_size - chunk_offset, &bytes_read, sub_batch);
 	}
@@ -670,9 +676,9 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	{
 		// get remaining part of last_chunk
 		last_buf = g_slice_alloc(remaining);
-		last_obj = j_object_new("chunks", g_array_index(hashes, gchar*, chunks - 1));
+		last_obj = j_object_new("chunks", g_array_index(item->hashes, gchar*, chunks - 1));
 		j_object_create(last_obj, sub_batch);
-		j_object_read(last_obj, last_buf, item->chunk_size - remaining, remaining, &bytes_read, sub_batch);
+		j_object_read(last_obj, last_buf, remaining, len, &bytes_read, sub_batch);
 	}
 	else if (remaining > 0)
 	{
@@ -687,7 +693,6 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	{
 		gchar* hash;
 		guint32 refcount = 0;
-		guint64 len = item->chunk_size - chunk_offset - remaining;
 		guint64 data_offset = chunk * item->chunk_size + chunk_offset;
 
 		//EVP_DigestInit_ex(hash_context, EVP_sha256(), NULL);
@@ -711,7 +716,6 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		}
 		//EVP_DigestFinal_ex(hash_context, hash_gen, &md_len);
 		algo_array[hash_choice]->finalize(hash_context, &hash);
-		//printf("Write Hash: %s\n", hash);
 
 		chunk_kv = j_kv_new("chunk_refs", (const gchar*)hash);
 		j_kv_get_callback(chunk_kv, j_item_hash_ref_callback, &refcount, sub_batch);
@@ -719,6 +723,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 		if (refcount == 0)
 		{
+			//printf("Write Hash: %s\n", hash);
 			chunk_obj = j_object_new("chunks", (const gchar*)hash);
 			j_object_create(chunk_obj, batch);
 
@@ -737,23 +742,22 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 			}
 		}
 		/*
-        //FIXME
-        else{
-            if (chunk == 0 && chunk_offset > 0)
+		//FIXME
+		else
+		{
+			if (chunk == 0 && chunk_offset > 0)
 			{
-                j_helper_atomic_add(bytes_written, chunk_offset);
-
+				j_helper_atomic_add(bytes_written, chunk_offset);
 			}
 
-            j_helper_atomic_add(bytes_written, len);
+			j_helper_atomic_add(bytes_written, len);
 
 			if (chunk == chunks - 1 && remaining > 0)
 			{
-                j_helper_atomic_add(bytes_written, remaining);
+				j_helper_atomic_add(bytes_written, remaining);
 			}
-        }
-        */
-
+		}
+		*/
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount + 1);
 
