@@ -121,7 +121,6 @@ test_io(void)
 	ret = j_batch_execute(batch);
 	j_item_dedup_set_chunk_size(item, 8);
 
-
 	//printf("\nTEST: write 2 full chunks\n");
 	j_item_dedup_write(item, &data, sizeof(data) - 1, 0, &bytes_written, batch);
 	ret = j_batch_execute(batch);
@@ -153,7 +152,6 @@ test_io(void)
 	g_assert_cmpint(bytes_read, ==, 16);
 	g_assert_cmpstr(data2, ==, "4234567887654321");
 
-
 	memset(data2, '0', 16);
 	//printf("\nTEST: read 3 bytes of 1 chunks\n");
 	j_item_dedup_read(item, data2, 3, 0, &bytes_read, batch);
@@ -171,7 +169,6 @@ test_io(void)
 	if (!ret)
 	{
 	}
-	
 }
 
 void
