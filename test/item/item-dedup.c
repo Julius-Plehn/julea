@@ -108,7 +108,7 @@ test_io(void)
 	g_autoptr(JBatch) batch = NULL;
 	g_autoptr(JCollection) collection = NULL;
 	g_autoptr(JItemDedup) item = NULL;
-	const char data[] = "1234567887654321"; //test-data-12345
+	const char data[] = "1234567887654321";
 	char data2[sizeof(data)];
 	char data3[3];
 	const char fortytwo[] = "42";
@@ -171,11 +171,53 @@ test_io(void)
 	}
 }
 
+static void
+test_io2(void)
+{
+	gboolean ret;
+	g_autoptr(JBatch) batch = NULL;
+	g_autoptr(JCollection) collection = NULL;
+	g_autoptr(JItemDedup) item = NULL;
+	const char data[] = "1234567";
+	char data2[sizeof(data)];
+
+	for(unsigned long int i = 3; i < sizeof(data); ++i)
+	{
+		guint64 bytes_written = 0;
+		guint64 bytes_read = 0;
+
+		batch = j_batch_new_for_template(J_SEMANTICS_TEMPLATE_DEFAULT);
+		collection = j_collection_create("test-collection", batch);
+		item = j_item_dedup_create(collection, "test-item", NULL, batch);
+		ret = j_batch_execute(batch);
+		j_item_dedup_set_chunk_size(item, i);
+
+		printf("size: %d\n", sizeof(data));
+
+		printf("\nTEST: write\n");
+		j_item_dedup_write(item, &data, sizeof(data), 0, &bytes_written, batch);
+		ret = j_batch_execute(batch);
+		g_assert_cmpint(bytes_written, ==, 8);
+	}
+
+
+	j_item_dedup_delete(item, batch);
+	ret = j_batch_execute(batch);
+
+	g_assert(item != NULL);
+
+	//TODO: ??
+	if (!ret)
+	{
+	}
+}
+
 void
 test_item_dedup(void)
 {
 	g_test_add_func("/item/item_dedup/new_free", test_item_dedup_new_free);
 	g_test_add_func("/item/item_dedup/io", test_io);
+	g_test_add_func("/item/item_dedup/io2", test_io2);
 	g_test_add("/item/item_dedup/ref_unref", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_ref_unref, test_item_dedup_fixture_teardown);
 	g_test_add("/item/item_dedup/name", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_name, test_item_dedup_fixture_teardown);
 	g_test_add("/item/item_dedup/size", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_size, test_item_dedup_fixture_teardown);
