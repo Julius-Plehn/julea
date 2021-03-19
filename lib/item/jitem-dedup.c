@@ -39,6 +39,7 @@
 #include <julea-object.h>
 
 #include <openssl/evp.h>
+#include <math.h>
 
 //#include <hashing/jhash_sha256.h>
 //#include <hashing/jhash_xxhash.h>
@@ -613,6 +614,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	int hash_choice;
 	gboolean ret;
 	guint64 len;
+	guint64 last_chunk;
 
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(data != NULL);
@@ -628,11 +630,15 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	chunks = length / item->chunk_size;
 	if ((length % item->chunk_size) > 0)
 		chunks++;
-	//last_chunk = first_chunk + chunks - 1; // might be unecesarry
+	last_chunk = first_chunk + chunks - 1; // might be unecesarry
 	remaining = chunks * item->chunk_size - chunk_offset - length;
-	len = item->chunk_size - chunk_offset - (chunks * item->chunk_size - chunk_offset - length);
-	//len = item->chunk_size - chunk_offset - remaining;
+	//len = item->chunk_size - chunk_offset - (chunks * item->chunk_size - chunk_offset - length);
+	len = item->chunk_size - chunk_offset - remaining;
+	if(item->chunk_size % len != 0){
+		++len;
+	}
 
+	printf("last_chunk Size: %ld\n", last_chunk);
 	printf("Chunk Size: %ld\n", item->chunk_size);
 	printf("First_chunk: %ld\n", first_chunk);
 	printf("Offset: %ld\n", offset);
@@ -693,6 +699,9 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		gchar* hash;
 		guint32 refcount = 0;
 		guint64 data_offset = chunk * item->chunk_size + chunk_offset;
+		if (chunk == chunks - 1 && last_chunk > 0)
+			len = last_chunk;
+		printf("len-Z: %d\n", len);
 
 		//EVP_DigestInit_ex(hash_context, EVP_sha256(), NULL);
 		algo_array[hash_choice]->init(hash_context);
@@ -722,7 +731,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 		if (refcount == 0)
 		{
-			//printf("Write Hash: %s\n", hash);
+			printf("Write Hash: %s\n", hash);
 			chunk_obj = j_object_new("chunks", (const gchar*)hash);
 			j_object_create(chunk_obj, batch);
 
@@ -734,7 +743,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 			j_object_write(chunk_obj, (const gchar*)data + data_offset, len, chunk_offset, bytes_written, batch);
 
-			if (chunk == chunks - 1 && remaining > 0)
+			if (chunk == chunks - 1 && remaining > 0 && remaining>len)
 			{
 				//j_object_write(chunk_obj, (const gchar*)data + chunk * item->chunk_size, item->chunk_size - remaining, 0, bytes_written, batch);
 				j_object_write(chunk_obj, last_buf, remaining, item->chunk_size - remaining, bytes_written, batch);
