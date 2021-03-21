@@ -413,6 +413,7 @@ j_item_dedup_delete(JItemDedup* item, JBatch* batch)
 	for (guint64 i = 0; i < item->hashes->len; i++)
 	{
 		gchar* hash = g_array_index(item->hashes, gchar*, i);
+		printf("%s\n", hash);
 		j_item_unref_chunk(hash, batch);
 		g_array_remove_index(item->hashes, i);
 		g_free(hash);
@@ -585,7 +586,7 @@ j_item_dedup_read(JItemDedup* item, gpointer data, guint64 length, guint64 offse
  * Writes an item.
  *
  * \note
- * j_item_write() modifies bytes_written even if j_batch_execute() is not called.
+ * j_item_dedup_write() modifies bytes_written even if j_batch_execute() is not called.
  *
  * \code
  * \endcode
@@ -613,7 +614,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	void* hash_context;
 	int hash_choice;
 	gboolean ret;
-	guint64 len;
+	//guint64 len;
 	guint64 last_chunk;
 
 	g_return_if_fail(item != NULL);
@@ -626,6 +627,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 	// needs to be modified for non static hashing
 	first_chunk = offset / item->chunk_size;
+	// Chunk offset of the very first chunk
 	chunk_offset = offset % item->chunk_size;
 	chunks = length / item->chunk_size;
 	if ((length % item->chunk_size) > 0)
@@ -633,12 +635,15 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	last_chunk = first_chunk + chunks - 1; // might be unecesarry
 	remaining = chunks * item->chunk_size - chunk_offset - length;
 	//len = item->chunk_size - chunk_offset - (chunks * item->chunk_size - chunk_offset - length);
-	len = item->chunk_size - chunk_offset - remaining;
-	if(item->chunk_size % len != 0){
-		++len;
-	}
+	//len = item->chunk_size - chunk_offset - remaining; // INFO: +1?
 
-	printf("last_chunk Size: %ld\n", last_chunk);
+	// TODO: ???????
+	//if(item->chunk_size % len != 0){
+		//++len;
+	//}
+
+	printf("\nContent: %s", data);
+	printf("\nlast_chunk: %ld\n", last_chunk);
 	printf("Chunk Size: %ld\n", item->chunk_size);
 	printf("First_chunk: %ld\n", first_chunk);
 	printf("Offset: %ld\n", offset);
@@ -646,7 +651,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	printf("Chunks: %ld\n", chunks);
 	printf("remaining: %ld\n", remaining);
 	printf("Length: %ld\n", length);
-	printf("Len: %ld\n", len);
+	//printf("Len: %ld\n", len);
 	printf("Hash Len: %d\n", item->hashes->len);
 
 	printf("chunks:%ld\n", chunks);
@@ -668,9 +673,10 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	{
 		// get offset part of first_chunk
 		first_buf = g_slice_alloc(chunk_offset);
-		first_obj = j_object_new("chunks", g_array_index(item->hashes, gchar*, 0));
+		first_obj = j_object_new("chunks", g_array_index(item->hashes, gchar*, first_chunk));
 		j_object_create(first_obj, sub_batch);
-		j_object_read(first_obj, first_buf, chunk_offset, item->chunk_size - chunk_offset, &bytes_read, sub_batch);
+		j_object_read(first_obj, first_buf, chunk_offset, 0, &bytes_read, sub_batch);
+		
 	}
 	else if (chunk_offset > 0)
 	{
@@ -681,9 +687,10 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	{
 		// get remaining part of last_chunk
 		last_buf = g_slice_alloc(remaining);
-		last_obj = j_object_new("chunks", g_array_index(item->hashes, gchar*, chunks - 1));
+		last_obj = j_object_new("chunks", g_array_index(item->hashes, gchar*, last_chunk));
 		j_object_create(last_obj, sub_batch);
-		j_object_read(last_obj, last_buf, remaining, len, &bytes_read, sub_batch);
+		j_object_read(last_obj, last_buf, remaining, item->chunk_size - remaining, &bytes_read, sub_batch);
+		
 	}
 	else if (remaining > 0)
 	{
@@ -691,6 +698,8 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	}
 
 	ret = j_batch_execute(sub_batch);
+	printf("first_buf: %s\n", first_buf);
+	printf("last_buf: %s\n", last_buf);
 
 	hash_context = algo_array[hash_choice]->create_context();
 
@@ -698,10 +707,8 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	{
 		gchar* hash;
 		guint32 refcount = 0;
-		guint64 data_offset = chunk * item->chunk_size + chunk_offset;
-		if (chunk == chunks - 1 && last_chunk > 0)
-			len = last_chunk;
-		printf("len-Z: %d\n", len);
+		guint64 data_offset = chunk * item->chunk_size;
+		guint64 len = item->chunk_size - chunk_offset - remaining;
 
 		//EVP_DigestInit_ex(hash_context, EVP_sha256(), NULL);
 		algo_array[hash_choice]->init(hash_context);
@@ -711,6 +718,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 			//EVP_DigestUpdate(hash_context, first_buf, chunk_offset);
 			algo_array[hash_choice]->update(hash_context, first_buf, chunk_offset);
 			//EVP_DigestUpdate(hash_context, data, item->chunk_size - chunk_offset);
+	
 		}
 
 		//EVP_DigestUpdate(hash_context, (const gchar*)data + data_offset, len);
@@ -737,13 +745,14 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 			if (chunk == 0 && chunk_offset > 0)
 			{
+				printf("stuff 1: %s\n", first_buf);
 				j_object_write(chunk_obj, first_buf, chunk_offset, 0, bytes_written, batch);
 				//j_object_write(chunk_obj, data, item->chunk_size - chunk_offset, chunk_offset, bytes_written, batch);
 			}
 
 			j_object_write(chunk_obj, (const gchar*)data + data_offset, len, chunk_offset, bytes_written, batch);
 
-			if (chunk == chunks - 1 && remaining > 0 && remaining>len)
+			if (chunk == chunks - 1 && remaining > 0) // && remaining>len
 			{
 				//j_object_write(chunk_obj, (const gchar*)data + chunk * item->chunk_size, item->chunk_size - remaining, 0, bytes_written, batch);
 				j_object_write(chunk_obj, last_buf, remaining, item->chunk_size - remaining, bytes_written, batch);
@@ -780,16 +789,16 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 		if (chunk < old_chunks)
 		{
-			gchar* old_hash = g_array_index(item->hashes, gchar*, chunk);
+			gchar* old_hash = g_array_index(item->hashes, gchar*, first_chunk + chunk);
 			if (g_strcmp0(old_hash, (gchar*)hash) != 0)
 			{
 				j_item_unref_chunk(old_hash, batch);
-				g_array_remove_index(item->hashes, chunk);
+				g_array_remove_index(item->hashes, first_chunk + chunk);
 				g_free(old_hash);
 			}
 		}
 
-		g_array_insert_val(item->hashes, chunk, hash);
+		g_array_insert_val(item->hashes, first_chunk + chunk, hash);
 	}
 	//EVP_MD_CTX_destroy(hash_context);
 	algo_array[hash_choice]->destroy(hash_context);
