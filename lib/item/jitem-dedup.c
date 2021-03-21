@@ -555,7 +555,7 @@ j_item_dedup_read(JItemDedup* item, gpointer data, guint64 length, guint64 offse
 	{
 		guint64 from, to, part;
 		const gchar* hash = g_array_index(item->hashes, gchar*, chunk);
-		printf("Read Hash: %s\n", hash);
+		//printf("Read Hash: %s\n", hash);
 		chunk_obj = j_object_new("chunks", hash);
 		j_object_create(chunk_obj, batch);
 		from = 0;
