@@ -125,60 +125,61 @@ test_io(void)
 	printf("data2[] %d\n", sizeof(data2));
 	printf("data3[] %d\n", sizeof(data3));
 	printf("ab[] %d\n", sizeof(ab));
-	//printf("\nTEST: write 2 full chunks\n");
+
+	/* Write two full chunks */
 	j_item_dedup_write(item, &data, sizeof(data) - 1, 0, &bytes_written, batch);
 	ret = j_batch_execute(batch);
 	g_assert_cmpint(bytes_written, ==, 16);
 
-	//printf("\nTEST: read 2 full chunks\n");
+	/* Read two full chunks */
 	j_item_dedup_read(item, data2, 16, 0, &bytes_read, batch);
 	ret = j_batch_execute(batch);
 	data2[sizeof(data) - 1] = '\0';
 	g_assert_cmpint(bytes_read, ==, 16);
 	g_assert_cmpstr(data2, ==, "1234567887654321");
 
-	//printf("\nTEST: read 2 chars\n");
+	/* Read two chars on two chunks */
 	j_item_dedup_read(item, data3, 2, 7, &bytes_read, batch);
 	ret = j_batch_execute(batch);
 	data3[2] = '\0';
 	g_assert_cmpint(bytes_read, ==, 2);
 	g_assert_cmpstr(data3, ==, "88");
 
-	//printf("\nTEST: overwrite 2 chars\n");
-	//j_item_dedup_write(item, &ab, 2, 0, &bytes_written, batch);
-	//j_item_dedup_write(item, &ab, 2, 13, &bytes_written, batch);
-	//ret = j_batch_execute(batch);
-	//g_assert_cmpint(bytes_written, ==, 8);
-
+	/* Write two bytes at index 1 */
 	j_item_dedup_write(item, &ab, 2, 1, &bytes_written, batch);
 	//j_item_dedup_write(item, &ab, 2, 13, &bytes_written, batch);
 	ret = j_batch_execute(batch);
-	//g_assert_cmpint(bytes_written, ==, 8);
+	g_assert_cmpint(bytes_written, ==, 8);
 
 	memset(data2, '0', 16);
-	//printf("\nTEST: read 2 full chunks #2\n");
 	j_item_dedup_read(item, data2, 16, 0, &bytes_read, batch);
 	ret = j_batch_execute(batch);
-	//data2[2] = '\0';
-	printf("%s\n", data2);
 	g_assert_cmpint(bytes_read, ==, 16);
 	g_assert_cmpstr(data2, ==, "1ab4567887654321");
 
-	printf("\nBUG DOWN HERE\n");
-	printf("%s\n", data2);
-
+	/* Write part at the end of second chunk */
 	j_item_dedup_write(item, &ab, 2, 13, &bytes_written, batch);
 	ret = j_batch_execute(batch);
-	//g_assert_cmpint(bytes_written, ==, 8);
+	g_assert_cmpint(bytes_written, ==, 8);
 
 	memset(data2, '0', 16);
-	//printf("\nTEST: read 2 full chunks #2\n");
 	j_item_dedup_read(item, data2, 16, 0, &bytes_read, batch);
 	ret = j_batch_execute(batch);
-	//data2[2] = '\0';
-	printf("%s\n", data2);
-	//g_assert_cmpint(bytes_read, ==, 16);
+	g_assert_cmpint(bytes_read, ==, 16);
 	g_assert_cmpstr(data2, ==, "1ab4567887654ab1");
+
+	/* TODO: Bug? */
+	/*
+	j_item_dedup_write(item, &ab, 2, 1, &bytes_written, batch);
+	j_item_dedup_write(item, &ab, 2, 13, &bytes_written, batch);
+	ret = j_batch_execute(batch);
+
+	memset(data2, '0', 16);
+	j_item_dedup_read(item, data2, 16, 0, &bytes_read, batch);
+	ret = j_batch_execute(batch);
+	g_assert_cmpint(bytes_read, ==, 16);
+	g_assert_cmpstr(data2, ==, "1ab4567887654ab1");
+	*/
 
 	j_item_dedup_delete(item, batch);
 	ret = j_batch_execute(batch);
