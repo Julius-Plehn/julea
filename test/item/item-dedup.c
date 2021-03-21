@@ -121,11 +121,6 @@ test_io(void)
 	ret = j_batch_execute(batch);
 	j_item_dedup_set_chunk_size(item, 8);
 
-	printf("data[] %d\n", sizeof(data));
-	printf("data2[] %d\n", sizeof(data2));
-	printf("data3[] %d\n", sizeof(data3));
-	printf("ab[] %d\n", sizeof(ab));
-
 	/* Write two full chunks */
 	j_item_dedup_write(item, &data, sizeof(data) - 1, 0, &bytes_written, batch);
 	ret = j_batch_execute(batch);
@@ -147,7 +142,6 @@ test_io(void)
 
 	/* Write two bytes at index 1 */
 	j_item_dedup_write(item, &ab, 2, 1, &bytes_written, batch);
-	//j_item_dedup_write(item, &ab, 2, 13, &bytes_written, batch);
 	ret = j_batch_execute(batch);
 	g_assert_cmpint(bytes_written, ==, 8);
 
@@ -200,12 +194,15 @@ test_io2(void)
 	g_autoptr(JCollection) collection = NULL;
 	g_autoptr(JItemDedup) item = NULL;
 	const char data[] = "1234567";
-	char data2[sizeof(data)];
 
-	for (unsigned long int i = 3; i < sizeof(data); ++i)
+	for (unsigned long int i = 1; i < sizeof(data); ++i)
 	{
 		guint64 bytes_written = 0;
 		guint64 bytes_read = 0;
+		char data2[sizeof(data)];
+		guint64 expected_chunks = sizeof(data) / i;
+		if ((sizeof(data) % i) > 0)
+			expected_chunks++;
 
 		batch = j_batch_new_for_template(J_SEMANTICS_TEMPLATE_DEFAULT);
 		collection = j_collection_create("test-collection-dedup", batch);
@@ -213,16 +210,18 @@ test_io2(void)
 		ret = j_batch_execute(batch);
 		j_item_dedup_set_chunk_size(item, i);
 
-		printf("size: %d\n", sizeof(data));
-
-		printf("\nTEST: write\n");
 		j_item_dedup_write(item, &data, sizeof(data), 0, &bytes_written, batch);
 		ret = j_batch_execute(batch);
-		g_assert_cmpint(bytes_written, ==, 8);
-	}
+		g_assert_cmpint(bytes_written, ==, expected_chunks * i);
 
-	j_item_dedup_delete(item, batch);
-	ret = j_batch_execute(batch);
+		j_item_dedup_read(item, data2, sizeof(data), 0, &bytes_read, batch);
+		ret = j_batch_execute(batch);
+		g_assert_cmpint(bytes_read, ==, sizeof(data));
+		g_assert_cmpstr(data2, ==, "1234567");
+
+		j_item_dedup_delete(item, batch);
+		ret = j_batch_execute(batch);
+	}
 
 	g_assert(item != NULL);
 
@@ -237,7 +236,7 @@ test_item_dedup(void)
 {
 	g_test_add_func("/item/item_dedup/new_free", test_item_dedup_new_free);
 	g_test_add_func("/item/item_dedup/io", test_io);
-	//g_test_add_func("/item/item_dedup/io2", test_io2);
+	g_test_add_func("/item/item_dedup/io2", test_io2);
 	g_test_add("/item/item_dedup/ref_unref", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_ref_unref, test_item_dedup_fixture_teardown);
 	g_test_add("/item/item_dedup/name", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_name, test_item_dedup_fixture_teardown);
 	g_test_add("/item/item_dedup/size", JItemDedup*, NULL, test_item_dedup_fixture_setup, test_item_dedup_size, test_item_dedup_fixture_teardown);
