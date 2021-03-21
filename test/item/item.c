@@ -101,7 +101,6 @@ test_item_modification_time(JItem** item, gconstpointer data)
 	g_assert_cmpuint(j_item_get_modification_time(*item), >, 0);
 }
 
-
 static void
 test_io(void)
 {
@@ -181,5 +180,4 @@ test_item_item(void)
 	g_test_add("/item/item/name", JItem*, NULL, test_item_fixture_setup, test_item_name, test_item_fixture_teardown);
 	g_test_add("/item/item/size", JItem*, NULL, test_item_fixture_setup, test_item_size, test_item_fixture_teardown);
 	g_test_add("/item/item/modification_time", JItem*, NULL, test_item_fixture_setup, test_item_modification_time, test_item_fixture_teardown);
-
 }

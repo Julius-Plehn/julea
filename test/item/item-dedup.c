@@ -150,7 +150,6 @@ test_io(void)
 	//ret = j_batch_execute(batch);
 	//g_assert_cmpint(bytes_written, ==, 8);
 
-	
 	j_item_dedup_write(item, &ab, 2, 1, &bytes_written, batch);
 	//j_item_dedup_write(item, &ab, 2, 13, &bytes_written, batch);
 	ret = j_batch_execute(batch);
@@ -164,8 +163,6 @@ test_io(void)
 	printf("%s\n", data2);
 	g_assert_cmpint(bytes_read, ==, 16);
 	g_assert_cmpstr(data2, ==, "1ab4567887654321");
-
-
 
 	printf("\nBUG DOWN HERE\n");
 	printf("%s\n", data2);
@@ -204,7 +201,7 @@ test_io2(void)
 	const char data[] = "1234567";
 	char data2[sizeof(data)];
 
-	for(unsigned long int i = 3; i < sizeof(data); ++i)
+	for (unsigned long int i = 3; i < sizeof(data); ++i)
 	{
 		guint64 bytes_written = 0;
 		guint64 bytes_read = 0;
@@ -222,7 +219,6 @@ test_io2(void)
 		ret = j_batch_execute(batch);
 		g_assert_cmpint(bytes_written, ==, 8);
 	}
-
 
 	j_item_dedup_delete(item, batch);
 	ret = j_batch_execute(batch);
