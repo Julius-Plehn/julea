@@ -640,7 +640,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	printf("Offset: %ld\n", offset);
 	printf("Chunk Offset: %ld\n", chunk_offset);
 	printf("Chunks: %ld\n", chunks);
-	printf("remaining: %ld\n", remaining);
+	printf("remaining: %" G_GUINT64_FORMAT "\n", remaining);
 	printf("Length: %ld\n", length);
 	//printf("Len: %ld\n", len);
 	printf("Hash Len: %d\n", item->hashes->len);
@@ -978,7 +978,7 @@ j_item_dedup_new(JCollection* collection, gchar const* name, JDistribution* dist
 	item->ref_count = 1;
 
 	item->hashes = g_array_new(FALSE, FALSE, sizeof(guchar*));
-	item->chunk_size = 1024; // small size for testing only
+	item->chunk_size = 1024;
 
 	path = g_build_path("/", j_collection_get_name(item->collection), item->name, NULL);
 	item->kv = j_kv_new("items", path);

@@ -360,8 +360,9 @@ main(int argc, char** argv)
 
 	// Item client
 	benchmark_collection();
-	benchmark_item();
 	*/
+	benchmark_item();
+
 	benchmark_item_dedup();
 	/*
 	// HDF5 client
