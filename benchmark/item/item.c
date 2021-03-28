@@ -379,17 +379,19 @@ benchmark_item_read_batch(BenchmarkRun* run)
 static void
 _benchmark_item_write(BenchmarkRun* run, gboolean use_batch, guint block_size)
 {
-	guint const n = (use_batch) ? 10000 : 1000;
+	guint const n = (use_batch) ? 10000 : 10;
 
 	g_autoptr(JCollection) collection = NULL;
 	g_autoptr(JItem) item = NULL;
 	g_autoptr(JBatch) batch = NULL;
 	g_autoptr(JSemantics) semantics = NULL;
-	gchar dummy[block_size];
+	//gchar dummy[block_size];
+	gchar* dummy = calloc(1, block_size);
+
 	guint64 nb = 0;
 	gboolean ret;
 
-	memset(dummy, 0, block_size);
+	//memset(dummy, 0, block_size);
 
 	semantics = j_benchmark_get_semantics();
 	batch = j_batch_new(semantics);
@@ -405,7 +407,7 @@ _benchmark_item_write(BenchmarkRun* run, gboolean use_batch, guint block_size)
 	{
 		for (guint i = 0; i < n; i++)
 		{
-			j_item_write(item, &dummy, block_size, i * block_size, &nb, batch);
+			j_item_write(item, dummy, block_size, i * block_size, &nb, batch);
 
 			if (!use_batch)
 			{
@@ -429,7 +431,7 @@ _benchmark_item_write(BenchmarkRun* run, gboolean use_batch, guint block_size)
 	j_collection_delete(collection, batch);
 	ret = j_batch_execute(batch);
 	g_assert_true(ret);
-
+	free(dummy);
 	run->operations = n;
 	run->bytes = n * block_size;
 }
@@ -437,7 +439,7 @@ _benchmark_item_write(BenchmarkRun* run, gboolean use_batch, guint block_size)
 static void
 benchmark_item_write(BenchmarkRun* run)
 {
-	_benchmark_item_write(run, FALSE, 4 * 1024);
+	_benchmark_item_write(run, FALSE, 4 * 1024 * 100000);
 }
 
 static void
@@ -514,6 +516,7 @@ benchmark_item_unordered_create_delete_batch(BenchmarkRun* run)
 void
 benchmark_item(void)
 {
+	/*
 	j_benchmark_add("/item/item/create", benchmark_item_create);
 	j_benchmark_add("/item/item/create-batch", benchmark_item_create_batch);
 	j_benchmark_add("/item/item/delete", benchmark_item_delete);
@@ -521,11 +524,14 @@ benchmark_item(void)
 	j_benchmark_add("/item/item/delete-batch-without-get", benchmark_item_delete_batch_without_get);
 	j_benchmark_add("/item/item/get-status", benchmark_item_get_status);
 	j_benchmark_add("/item/item/get-status-batch", benchmark_item_get_status_batch);
+	*/
 	/* FIXME get */
 	j_benchmark_add("/item/item/read", benchmark_item_read);
 	j_benchmark_add("/item/item/read-batch", benchmark_item_read_batch);
 	j_benchmark_add("/item/item/write", benchmark_item_write);
 	j_benchmark_add("/item/item/write-batch", benchmark_item_write_batch);
+	/*
 	j_benchmark_add("/item/item/unordered-create-delete", benchmark_item_unordered_create_delete);
 	j_benchmark_add("/item/item/unordered-create-delete-batch", benchmark_item_unordered_create_delete_batch);
+	*/
 }
