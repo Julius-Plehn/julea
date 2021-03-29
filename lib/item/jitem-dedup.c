@@ -543,7 +543,6 @@ j_item_dedup_read(JItemDedup* item, gpointer data, guint64 length, guint64 offse
 	g_return_if_fail(bytes_read != NULL);
 
 	first_chunk = offset / item->chunk_size;
-	//FIXME test all cases
 	chunks = (length + offset) / item->chunk_size;
 	if ((length + offset) % item->chunk_size > 0)
 		chunks++;
@@ -613,6 +612,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	int hash_choice;
 	gboolean ret;
 	guint64 last_chunk;
+	gboolean no_fill = true;
 
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(data != NULL);
@@ -622,7 +622,6 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 	// refresh chunks before write
 	j_item_refresh_hashes(item, j_batch_get_semantics(batch));
 
-	// needs to be modified for non static hashing
 	first_chunk = offset / item->chunk_size;
 	// Chunk offset of the very first chunk
 	chunk_offset = offset % item->chunk_size;
@@ -653,9 +652,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 	sub_batch = j_batch_new(j_batch_get_semantics(batch));
 
-	// get old_chunks:
-	// first_chunk if chunk_offset nonzero
-	// last_chunk if remaining is nonzero
+	// get old_chunks
 	if (chunk_offset > 0 && old_chunks > 0)
 	{
 		// get offset part of first_chunk
@@ -676,15 +673,14 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		last_obj = j_object_new("chunks", g_array_index(item->hashes, gchar*, last_chunk));
 		j_object_create(last_obj, sub_batch);
 		j_object_read(last_obj, last_buf, remaining, item->chunk_size - remaining, &bytes_read, sub_batch);
+		no_fill = false;
 	}
-	else if (remaining > 0)
+	else if (remaining > 0 && !no_fill)
 	{
 		last_buf = g_slice_alloc0(remaining);
 	}
 
 	ret = j_batch_execute(sub_batch);
-	//printf("first_buf: %s\n", first_buf);
-	//printf("last_buf: %s\n", last_buf);
 
 	hash_context = algo_array[hash_choice]->create_context();
 
@@ -693,7 +689,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		gchar* hash;
 		guint32 refcount = 0;
 		guint64 data_offset = chunk * item->chunk_size;
-		guint64 len = item->chunk_size - chunk_offset; // - remaining; // TODO: use case? - remaining;
+		guint64 len = item->chunk_size - chunk_offset;
 
 		algo_array[hash_choice]->init(hash_context);
 
@@ -709,20 +705,16 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		{
 			len = item->chunk_size - remaining;
 		}
-		//printf("len: %d\n", len);
 
 		if (chunk == 0)
 		{
 			algo_array[hash_choice]->update(hash_context, first_buf, chunk_offset);
-			//EVP_DigestUpdate(hash_context, data, item->chunk_size - chunk_offset);
 		}
 
-		//EVP_DigestUpdate(hash_context, (const gchar*)data + data_offset, len);
 		algo_array[hash_choice]->update(hash_context, (const gchar*)data + data_offset, len);
 
-		if (chunk == chunks - 1)
+		if (chunk == chunks - 1 && !no_fill)
 		{
-			//EVP_DigestUpdate(hash_context, (const gchar*)data + chunk * item->chunk_size, item->chunk_size - remaining);
 			algo_array[hash_choice]->update(hash_context, last_buf, remaining);
 		}
 		algo_array[hash_choice]->finalize(hash_context, &hash);
@@ -731,6 +723,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		j_kv_get_callback(chunk_kv, j_item_hash_ref_callback, &refcount, sub_batch);
 		ret = j_batch_execute(sub_batch);
 
+		//printf("Write Hash: %s\n", hash);
 		if (refcount == 0)
 		{
 			//printf("Write Hash: %s\n", hash);
@@ -745,29 +738,13 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 
 			j_object_write(chunk_obj, (const gchar*)data + data_offset, len, chunk_offset, bytes_written, batch);
 
-			if (chunk == chunks - 1 && remaining > 0) // && remaining>len
+			if (chunk == chunks - 1 && remaining > 0 && !no_fill) // && remaining>len
 			{
 				//j_object_write(chunk_obj, (const gchar*)data + chunk * item->chunk_size, item->chunk_size - remaining, 0, bytes_written, batch);
 				j_object_write(chunk_obj, last_buf, remaining, item->chunk_size - remaining, bytes_written, batch);
 			}
 		}
-		/*
-		//FIXME
-		else
-		{
-			if (chunk == 0 && chunk_offset > 0)
-			{
-				j_helper_atomic_add(bytes_written, chunk_offset);
-			}
 
-			j_helper_atomic_add(bytes_written, len);
-
-			if (chunk == chunks - 1 && remaining > 0)
-			{
-				j_helper_atomic_add(bytes_written, remaining);
-			}
-		}
-		*/
 		new_ref_bson = bson_new();
 		bson_append_int32(new_ref_bson, "ref", -1, refcount + 1);
 

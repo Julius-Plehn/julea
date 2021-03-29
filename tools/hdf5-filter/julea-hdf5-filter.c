@@ -109,7 +109,7 @@ compressorFilter(unsigned int flags, size_t cd_nelmts,
 		collection = j_collection_create("test-collection", batch);
 		item = j_item_dedup_create(collection, item_name, NULL, batch);
 		j_item_dedup_set_chunk_size(item, chunk_size);
-		j_batch_execute(batch);
+		//j_batch_execute(batch);
 
 		j_item_dedup_write(item, *buf, nbytes, 0, &bytes_written, batch);
 		j_batch_execute(batch);
