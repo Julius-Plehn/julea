@@ -85,7 +85,6 @@ struct JItemDedup
 
 	JKV* kv;
 	JKV* kv_h;
-	JObject* object;
 
 	/**
 	 * The status.
@@ -690,6 +689,7 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 		guint32 refcount = 0;
 		guint64 data_offset = chunk * item->chunk_size;
 		guint64 len = item->chunk_size - chunk_offset;
+		gboolean append_hash = TRUE;
 
 		algo_array[hash_choice]->init(hash_context);
 
@@ -766,14 +766,28 @@ j_item_dedup_write(JItemDedup* item, gconstpointer data, guint64 length, guint64
 				g_array_remove_index(item->hashes, first_chunk + chunk);
 				g_free(old_hash);
 			}
+			else
+			{
+				append_hash = FALSE;
+			}
 		}
-
-		g_array_insert_val(item->hashes, first_chunk + chunk, hash);
+		if (append_hash)
+		{
+			g_array_insert_val(item->hashes, first_chunk + chunk, hash);
+		}
 	}
 	algo_array[hash_choice]->destroy(hash_context);
 
 	j_kv_delete(item->kv_h, sub_batch);
 	serializes_bson = j_item_serialize_hashes(item);
+
+	/*
+	for (guint i = 0; i < item->hashes->len; ++i)
+	{
+		gchar* hash = g_array_index(item->hashes, gchar*, i);
+		g_print("a_hash: %s\n", hash);
+	}
+	*/
 
 	{
 		gpointer value;
@@ -811,7 +825,7 @@ j_item_dedup_get_status(JItemDedup* item, JBatch* batch)
 }
 
 /**
- * Returns an item's size.
+ * Returns an item's size. (logical)
  *
  * \code
  * \endcode
@@ -843,19 +857,43 @@ guint64
 j_item_dedup_get_size_physical(JItemDedup* item)
 {
 	J_TRACE_FUNCTION(NULL);
+	gboolean ret = TRUE;
 	GHashTable* table;
-	guint size;
+	guint64 size;
+	guint64 last_size;
+	gchar* last_hash;
 	g_return_val_if_fail(item != NULL, 0);
 
+	// Create a table of unique chunks
 	table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
-	for (guint i = 0; i < item->hashes->len; ++i)
+	for (guint i = 0; i < item->hashes->len - 1; ++i)
 	{
 		gchar* hash = g_array_index(item->hashes, gchar*, i);
 		g_hash_table_add(table, g_strdup(hash));
 	}
 
-	size = g_hash_table_size(table) * item->chunk_size;
+	// Last block might have an other size then chunks before
+	last_hash = g_array_index(item->hashes, gchar*, item->hashes->len - 1);
+	if (g_hash_table_contains(table, last_hash) == FALSE)
+	{
+		JObject* chunk_obj;
+		gint64 modification_time;
+		JBatch* sub_batch = j_batch_new_for_template(J_SEMANTICS_TEMPLATE_DEFAULT);
+		chunk_obj = j_object_new("chunks", last_hash);
+		j_object_create(chunk_obj, sub_batch);
+		j_object_status(chunk_obj, &modification_time, &last_size, sub_batch);
+		ret = j_batch_execute(sub_batch);
+	}
+	// Special case if last chunk existed previously in this item
+	else
+	{
+		g_hash_table_add(table, g_strdup(last_hash));
+	}
+
+	size = g_hash_table_size(table) * item->chunk_size + last_size;
 	g_hash_table_destroy(table);
+	if (!ret)
+		return 0;
 	return size;
 }
 
@@ -955,7 +993,7 @@ j_item_dedup_new(JCollection* collection, gchar const* name, JDistribution* dist
 	item->ref_count = 1;
 
 	item->hashes = g_array_new(FALSE, FALSE, sizeof(guchar*));
-	item->chunk_size = 1024;
+	item->chunk_size = 128000;
 
 	path = g_build_path("/", j_collection_get_name(item->collection), item->name, NULL);
 	item->kv = j_kv_new("items", path);
