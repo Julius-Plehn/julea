@@ -22,9 +22,6 @@
 #include <locale.h>
 #include <stdio.h>
 
-
-
-
 int
 main(int argc, char** argv)
 {
@@ -33,11 +30,11 @@ main(int argc, char** argv)
 	g_autoptr(JBatch) batch = NULL;
 	g_autoptr(JCollection) collection = NULL;
 	g_autoptr(JItemDedup) item = NULL;
-	gchar *contents;
-  	gsize len;
+	gchar* contents;
+	gsize len;
 	guint64 bytes_written = 0;
 	g_autofree gchar* basename = NULL;
-	
+
 	GError* error = NULL;
 	GOptionContext* context;
 
@@ -69,14 +66,13 @@ main(int argc, char** argv)
 	g_option_context_free(context);
 	basename = g_path_get_basename(opt_path);
 
-
-  	if (!g_file_get_contents (opt_path, &contents, &len, &error))
+	if (!g_file_get_contents(opt_path, &contents, &len, &error))
 	{
-    	g_printerr("Error: %s\n", error->message);
+		g_printerr("Error: %s\n", error->message);
 		g_error_free(error);
 	}
 	printf("Read file: %s | Size: %ld\n", opt_path, len);
-	
+
 	batch = j_batch_new_for_template(J_SEMANTICS_TEMPLATE_DEFAULT);
 	collection = j_collection_create("dedup-io", batch);
 	item = j_item_dedup_create(collection, basename, NULL, batch);
@@ -87,6 +83,8 @@ main(int argc, char** argv)
 
 	g_assert_true(j_batch_execute(batch));
 	//g_assert_cmpint(bytes_written, ==, len);
+	guint64 physical_size = j_item_dedup_get_size_physical(item);
+	g_print("Physical Size: %ld\n", physical_size);
 
 	g_free(contents);
 	g_free(opt_path);
