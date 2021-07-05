@@ -863,6 +863,7 @@ j_item_dedup_get_size_physical(JItemDedup* item)
 	guint64 last_size;
 	gchar* last_hash;
 	g_return_val_if_fail(item != NULL, 0);
+	g_return_val_if_fail(item->hashes->len > 0, 0);
 
 	// Create a table of unique chunks
 	table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
@@ -1006,7 +1007,7 @@ j_item_dedup_set_chunk_size(JItemDedup* item, guint64 chunk_size)
 {
 	g_return_if_fail(item != NULL);
 	g_return_if_fail(chunk_size > 0);
-	// TODO: Only allowed to change if item is new
+	g_return_if_fail(item->hashes->len == 0);
 	item->chunk_size = chunk_size;
 }
 
